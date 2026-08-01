@@ -510,9 +510,6 @@
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
     #toast.err { background: var(--toast-err-bg); border-color: rgba(248,113,113,0.3); }
 
-    @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 var(--accent-glow)} 50%{box-shadow:0 0 0 8px transparent} }
-    .pulsing { animation: pulse 1.5s ease-in-out infinite; }
-
     @keyframes diceRoll { 0%{transform:rotate(0) scale(1)} 30%{transform:rotate(180deg) scale(0.8)} 70%{transform:rotate(270deg) scale(1.1)} 100%{transform:rotate(360deg) scale(1)} }
     .dice-spin { display: inline-block; animation: diceRoll 0.45s ease; }
 
@@ -541,8 +538,7 @@
     </div>
     <div class="api-hint">
       Stored only in your browser's localStorage. Get a free key at
-      <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a>
-      — free tier is 15 requests/minute, more than enough. Works without one too (self-rate mode).
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a>. Works without one too (self-rate mode).
     </div>
   </div>
 
@@ -563,7 +559,7 @@
         🤖 Let AI Pick Something Unusual
       </button>
       <div class="info-note">
-        AI picks use one Gemini API call — free but counts toward the 15/min limit.
+        AI picks use one Gemini API call.
       </div>
     </div>
   </div>
@@ -684,7 +680,7 @@
       </div>
     </div>
 
-    <div class="card your-notes-card">
+    <div class="card your-notes-card" style="margin-top:14px;">
       <div class="label-sm">What you wrote</div>
       <div class="notes-display" id="notesDisplay"></div>
     </div>
@@ -726,7 +722,7 @@
       </div>
       <div class="fb-content" id="hdFeedback"></div>
     </div>
-    <div class="card your-notes-card">
+    <div class="card your-notes-card" style="margin-top:14px;">
       <div class="label-sm">What you wrote</div>
       <div class="notes-display" id="hdNotes"></div>
     </div>
@@ -898,632 +894,600 @@ const BUILTIN_TOPICS = [
   {t:"The Mariana Trench",c:"Geography"},
   {t:"The Gulf Stream",c:"Geography"},
   {t:"Formation of the Himalayas",c:"Geography"},
-  {t:"The Amazon rainforest",c:"Ecology"},
-  {t:"Monsoon weather systems",c:"Meteorology"},
-  {t:"How caves and stalactites form",c:"Geology"},
-  {t:"The formation of the Grand Canyon",c:"Geology"},
+  {t:"The Amazon rainforest",c:"Ecology"}
 ];
 
 // ═══════════════════════════════════════════════════════
-// STATE
+// GLOBAL STATE
 // ═══════════════════════════════════════════════════════
-const S = {
-  topic: null,
-  topicSource: 'builtin', // 'builtin' | 'custom' | 'ai'
-  dur: 7 * 60,
-  totalDur: 7 * 60,
-  timeLeft: 0,
-  interval: null,
-  paused: false,
-  ended: false,
-  rerolls: 3,
-  savedNotes: '',
-  customTopics: [],
-  history: [],
-};
+let currentTopic = null;
+let currentDurationMin = 7;
+let timerInterval = null;
+let totalSeconds = 0;
+let remainingSeconds = 0;
+let isPaused = false;
+let isTimerEnded = false;
+let customTopics = [];
+let historySessions = [];
+let currentRating = 0;
 
-const CIRC = 263.9;
-const HISTORY_LIMIT = 50;
+const CIRCUMFERENCE = 2 * Math.PI * 42; // 263.89
 
 // ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
-window.addEventListener('load', () => {
-  const k = localStorage.getItem('brainDumpKey');
-  if (k) document.getElementById('apiKey').value = k;
-  setDur(7);
-  applyTheme(localStorage.getItem('brainDumpTheme') || 'dark');
-  loadCustomTopics();
-  loadHistory();
+window.addEventListener("DOMContentLoaded", () => {
+  // Theme
+  const savedTheme = localStorage.getItem("bdt_theme") || "dark";
+  document.documentElement.setAttribute("data-theme", savedTheme);
+  document.getElementById("themeToggle").textContent = savedTheme === "light" ? "☀️" : "🌙";
+
+  // API Key
+  const savedKey = localStorage.getItem("bdt_gemini_key") || "";
+  document.getElementById("apiKey").value = savedKey;
+
+  // Custom Topics & History
+  try {
+    customTopics = JSON.parse(localStorage.getItem("bdt_custom_topics")) || [];
+    historySessions = JSON.parse(localStorage.getItem("bdt_history")) || [];
+  } catch(e) {
+    customTopics = []; historySessions = [];
+  }
+
   updateTopicCountLabel();
 });
 
 // ═══════════════════════════════════════════════════════
-// THEME
+// NAVIGATION & THEME
 // ═══════════════════════════════════════════════════════
-function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  document.getElementById('themeToggle').textContent = theme === 'dark' ? '🌙' : '☀️';
-}
 function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme');
-  const next = current === 'dark' ? 'light' : 'dark';
-  localStorage.setItem('brainDumpTheme', next);
-  applyTheme(next);
+  const cur = document.documentElement.getAttribute("data-theme");
+  const next = cur === "light" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("bdt_theme", next);
+  document.getElementById("themeToggle").textContent = next === "light" ? "☀️" : "🌙";
+}
+
+function showSection(id) {
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function goHome() {
+  stopTimer();
+  showSection("s-home");
+}
+
+function updateTopicCountLabel() {
+  const total = BUILTIN_TOPICS.length + customTopics.length;
+  document.getElementById("topicCountLabel").textContent = `${total}+ topics`;
 }
 
 // ═══════════════════════════════════════════════════════
 // API KEY
 // ═══════════════════════════════════════════════════════
-function saveKey() {
-  const v = document.getElementById('apiKey').value.trim();
-  if (!v) { toast('Enter a key first', true); return; }
-  localStorage.setItem('brainDumpKey', v);
-  toast('API key saved ✓');
-}
 function toggleKey(btn) {
-  const inp = document.getElementById('apiKey');
-  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
-  else { inp.type = 'password'; btn.textContent = 'Show'; }
-}
-function getKey() {
-  return localStorage.getItem('brainDumpKey') || document.getElementById('apiKey').value.trim();
-}
-
-// ═══════════════════════════════════════════════════════
-// TOPIC POOL
-// ═══════════════════════════════════════════════════════
-function getAllTopics() {
-  const custom = S.customTopics.map(t => ({...t, source:'custom'}));
-  const builtin = BUILTIN_TOPICS.map(t => ({...t, source:'builtin'}));
-  return [...builtin, ...custom];
-}
-
-function updateTopicCountLabel() {
-  const total = BUILTIN_TOPICS.length + S.customTopics.length;
-  const custom = S.customTopics.length;
-  const el = document.getElementById('topicCountLabel');
-  if (custom > 0) {
-    el.textContent = `${total} topics (${custom} custom)`;
+  const input = document.getElementById("apiKey");
+  if (input.type === "password") {
+    input.type = "text";
+    btn.textContent = "Hide";
   } else {
-    el.textContent = `${total}+ topics`;
+    input.type = "password";
+    btn.textContent = "Show";
   }
+}
+
+function saveKey() {
+  const key = document.getElementById("apiKey").value.trim();
+  localStorage.setItem("bdt_gemini_key", key);
+  showToast(key ? "Key saved successfully!" : "Key cleared.");
+}
+
+function getKey() {
+  return localStorage.getItem("bdt_gemini_key") || document.getElementById("apiKey").value.trim();
 }
 
 // ═══════════════════════════════════════════════════════
 // TOPIC ROLLING
 // ═══════════════════════════════════════════════════════
-function rollTopic(fromHome) {
-  if (!fromHome && S.rerolls <= 0) { toast('No more rerolls!', true); return; }
-  const sp = document.getElementById('diceSpan');
-  sp.className = 'dice-spin';
-  setTimeout(() => sp.className = '', 450);
+function rollTopic(animate = true) {
+  const dice = document.getElementById("diceSpan");
+  if (animate && dice) {
+    dice.classList.remove("dice-spin");
+    void dice.offsetWidth;
+    dice.classList.add("dice-spin");
+  }
 
-  const pool = getAllTopics();
-  const picked = pool[Math.floor(Math.random() * pool.length)];
-  S.topic = { t: picked.t, c: picked.c };
-  S.topicSource = picked.source;
+  const pool = [...BUILTIN_TOPICS, ...customTopics];
+  const choice = pool[Math.floor(Math.random() * pool.length)];
 
-  renderTopic();
-  S.rerolls = fromHome ? 3 : Math.max(0, S.rerolls - 1);
-  updateRerollNote();
-  showSection('s-topic');
+  currentTopic = {
+    t: choice.t,
+    c: choice.c || "General",
+    isAi: false,
+    isCustom: choice.isCustom || false
+  };
+
+  renderTopicCard();
+  showSection("s-topic");
 }
 
 async function rollAITopic() {
-  const key = getKey();
-  if (!key) { toast('Need an API key for AI-generated topics', true); return; }
+  const apiKey = getKey();
+  if (!apiKey) {
+    showToast("Please enter a Gemini API Key to use AI Topic generator", true);
+    return;
+  }
 
-  const btn = document.getElementById('aiRollBtn');
+  const btn = document.getElementById("aiRollBtn");
   btn.disabled = true;
-  btn.textContent = '🤖 Thinking...';
+  btn.textContent = "🤖 Generating...";
 
   try {
-    const topic = await geminiGenerateTopic(key);
-    S.topic = topic;
-    S.topicSource = 'ai';
-    renderTopic();
-    S.rerolls = 3;
-    updateRerollNote();
-    showSection('s-topic');
-  } catch(e) {
-    toast(`AI error: ${e.message}`, true);
+    const prompt = "Generate ONE interesting, highly specific, and unusual topic for a active recall brain-dump writing exercise. Examples: 'The 1919 Boston Molasses Flood', 'How PageRank algorithm works', 'The Fermi Paradox and Great Filter'. Return JSON only: {\"topic\": \"...\", \"category\": \"...\"}";
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || "API Error");
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const parsed = JSON.parse(text);
+
+    currentTopic = {
+      t: parsed.topic,
+      c: parsed.category || "AI Pick",
+      isAi: true,
+      isCustom: false
+    };
+
+    renderTopicCard();
+    showSection("s-topic");
+  } catch (err) {
+    showToast("Error generating topic: " + err.message, true);
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '🤖 Let AI Pick Something Unusual';
+    btn.textContent = "🤖 Let AI Pick Something Unusual";
   }
 }
 
-function renderTopic() {
-  const chip = document.getElementById('topicChip');
-  chip.textContent = S.topic.c;
-  chip.className = 'topic-chip' + (S.topicSource === 'ai' ? ' ai' : S.topicSource === 'custom' ? ' custom' : '');
-  document.getElementById('topicBig').textContent = S.topic.t;
+function renderTopicCard() {
+  const chip = document.getElementById("topicChip");
+  const big = document.getElementById("topicBig");
+  const note = document.getElementById("rerollNote");
+
+  chip.className = "topic-chip";
+  if (currentTopic.isAi) {
+    chip.classList.add("ai");
+    chip.textContent = `🤖 ${currentTopic.c}`;
+  } else if (currentTopic.isCustom) {
+    chip.classList.add("custom");
+    chip.textContent = `✏️ ${currentTopic.c}`;
+  } else {
+    chip.textContent = currentTopic.c;
+  }
+
+  big.textContent = currentTopic.t;
+  note.textContent = currentTopic.isAi ? "Generated by Gemini" : "";
 }
 
-function updateRerollNote() {
-  const el = document.getElementById('rerollNote');
-  el.textContent = S.rerolls > 0
-    ? `${S.rerolls} reroll${S.rerolls !== 1 ? 's' : ''} remaining`
-    : 'No rerolls left — commit to this one!';
-}
-
-// ═══════════════════════════════════════════════════════
-// DURATION
-// ═══════════════════════════════════════════════════════
-function setDur(m) {
-  S.dur = m * 60;
-  S.totalDur = m * 60;
-  document.querySelectorAll('.dur-btn').forEach(b => {
-    b.classList.toggle('active', b.textContent.trim() === `${m} min`);
+function setDur(min) {
+  currentDurationMin = min;
+  document.querySelectorAll(".dur-btn").forEach(b => {
+    b.classList.toggle("active", b.textContent.includes(`${min} min`));
   });
 }
 
 // ═══════════════════════════════════════════════════════
-// TIMER
+// TIMER & SESSION
 // ═══════════════════════════════════════════════════════
 function startSession() {
-  clearInterval(S.interval);
-  S.timeLeft = S.dur;
-  S.totalDur = S.dur;
-  S.paused = false;
-  S.ended = false;
+  document.getElementById("writeTopicNm").textContent = currentTopic.t;
+  document.getElementById("writeArea").value = "";
+  document.getElementById("wc").textContent = "0 words";
 
-  document.getElementById('writeTopicNm').textContent = S.topic.t;
-  document.getElementById('writeArea').value = '';
-  document.getElementById('wc').textContent = '0 words';
-  document.getElementById('pauseBtn').textContent = '⏸ Pause';
-  document.getElementById('pauseBtn').disabled = false;
-  document.getElementById('stopBtn').disabled = false;
-  document.getElementById('submitBtn').classList.remove('pulsing');
-  document.getElementById('tArc').classList.remove('stopped');
+  totalSeconds = currentDurationMin * 60;
+  remainingSeconds = totalSeconds;
+  isPaused = false;
+  isTimerEnded = false;
 
-  renderTimer();
-  document.getElementById('tSub').textContent = 'writing';
-  showSection('s-write');
+  updateTimerUI();
+  showSection("s-write");
 
-  S.interval = setInterval(tick, 1000);
+  clearInterval(timerInterval);
+  timerInterval = setInterval(tickTimer, 1000);
+
+  setTimeout(() => document.getElementById("writeArea").focus(), 300);
 }
 
-function tick() {
-  if (S.paused || S.ended) return;
-  S.timeLeft = Math.max(0, S.timeLeft - 1);
-  renderTimer();
-  if (S.timeLeft === 0) {
-    clearInterval(S.interval);
-    document.getElementById('tSub').textContent = "time's up!";
-    document.getElementById('submitBtn').classList.add('pulsing');
-    toast("Time's up! Submit when ready.");
+function tickTimer() {
+  if (isPaused || isTimerEnded) return;
+
+  remainingSeconds--;
+  updateTimerUI();
+
+  if (remainingSeconds <= 0) {
+    endTimer();
+    showToast("⏰ Time's up! Finish your thought and submit.");
   }
 }
 
-function renderTimer() {
-  const m = Math.floor(S.timeLeft / 60);
-  const s = S.timeLeft % 60;
-  document.getElementById('tDigits').textContent = `${m}:${String(s).padStart(2,'0')}`;
+function updateTimerUI() {
+  const m = Math.floor(remainingSeconds / 60);
+  const s = remainingSeconds % 60;
+  document.getElementById("tDigits").textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
 
-  const pct = S.timeLeft / S.totalDur;
-  document.getElementById('tArc').style.strokeDashoffset = CIRC * (1 - pct);
+  const arc = document.getElementById("tArc");
+  const sub = document.getElementById("tSub");
 
-  const arc = document.getElementById('tArc');
-  arc.classList.remove('warn','danger');
-  if (!S.ended) {
-    if (pct < 0.15) arc.classList.add('danger');
-    else if (pct < 0.33) arc.classList.add('warn');
+  if (isTimerEnded) {
+    sub.textContent = "ended";
+    arc.className = "t-arc stopped";
+    arc.style.strokeDashoffset = 0;
+    return;
   }
 
-  if (!S.paused && !S.ended && S.timeLeft > 0) {
-    document.getElementById('tSub').textContent = 'writing';
-  }
+  sub.textContent = isPaused ? "paused" : "remaining";
+
+  const pct = remainingSeconds / totalSeconds;
+  const offset = CIRCUMFERENCE * (1 - pct);
+  arc.style.strokeDashoffset = offset;
+
+  arc.className = "t-arc";
+  if (pct <= 0.15) arc.classList.add("danger");
+  else if (pct <= 0.35) arc.classList.add("warn");
 }
 
 function togglePause() {
-  if (S.ended) return;
-  S.paused = !S.paused;
-  document.getElementById('pauseBtn').textContent = S.paused ? '▶ Resume' : '⏸ Pause';
-  document.getElementById('tSub').textContent = S.paused ? 'paused' : 'writing';
+  if (isTimerEnded) return;
+  isPaused = !isPaused;
+  document.getElementById("pauseBtn").textContent = isPaused ? "▶ Resume" : "⏸ Pause";
+  updateTimerUI();
 }
 
 function endTimer() {
-  if (S.ended) return;
-  S.ended = true;
-  clearInterval(S.interval);
-  document.getElementById('tSub').textContent = 'stopped';
-  document.getElementById('tArc').classList.add('stopped');
-  document.getElementById('pauseBtn').disabled = true;
-  document.getElementById('stopBtn').disabled = true;
-  toast('Timer stopped — take your time.');
+  isTimerEnded = true;
+  clearInterval(timerInterval);
+  document.getElementById("pauseBtn").disabled = true;
+  document.getElementById("stopBtn").disabled = true;
+  updateTimerUI();
 }
 
-// ═══════════════════════════════════════════════════════
-// WORD COUNT
-// ═══════════════════════════════════════════════════════
+function stopTimer() {
+  clearInterval(timerInterval);
+  document.getElementById("pauseBtn").disabled = false;
+  document.getElementById("stopBtn").disabled = false;
+}
+
 function onNoteInput() {
-  const txt = document.getElementById('writeArea').value;
-  const w = txt.trim() ? txt.trim().split(/\s+/).length : 0;
-  document.getElementById('wc').textContent = `${w} word${w !== 1 ? 's' : ''}`;
+  const val = document.getElementById("writeArea").value.trim();
+  const words = val ? val.split(/\s+/).length : 0;
+  document.getElementById("wc").textContent = `${words} word${words === 1 ? "" : "s"}`;
 }
 
 // ═══════════════════════════════════════════════════════
-// SUBMIT
+// SUBMIT & AI EVALUATION
 // ═══════════════════════════════════════════════════════
 async function submit() {
-  clearInterval(S.interval);
-  const notes = document.getElementById('writeArea').value.trim();
-  if (!notes) { toast('Write something first!', true); return; }
-  S.savedNotes = notes;
-
-  const key = getKey();
-  if (!key) { showNoKeyFeedback(notes); return; }
-
-  showSection('s-loading');
-  document.getElementById('loadingMsg').textContent = 'Evaluating your brain dump…';
-  try {
-    const fb = await geminiEvaluate(key, S.topic.t, notes);
-    showFeedback(fb, notes, true);
-  } catch(e) {
-    showSection('s-write');
-    toast(`Error: ${e.message}`, true);
+  const notes = document.getElementById("writeArea").value.trim();
+  if (!notes) {
+    showToast("Please write something before submitting!", true);
+    return;
   }
-}
 
-// ═══════════════════════════════════════════════════════
-// GEMINI API
-// ═══════════════════════════════════════════════════════
-async function geminiCall(key, prompt, opts = {}) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+  stopTimer();
+  const apiKey = getKey();
+
+  if (!apiKey) {
+    // FALLBACK TO SELF RATE
+    document.getElementById("fbTopicNm").textContent = currentTopic.t;
+    document.getElementById("notesDisplay").textContent = notes;
+    document.getElementById("aiFeedbackCard").style.display = "none";
+    document.getElementById("selfRateCard").style.display = "block";
+    resetStars();
+    showSection("s-feedback");
+    return;
+  }
+
+  // GEMINI API CALL
+  showSection("s-loading");
+  try {
+    const prompt = `You are an expert tutor evaluating a user's active recall "brain dump" about a specific topic.
+Topic: "${currentTopic.t}" (Category: ${currentTopic.c})
+User's Brain Dump Notes:
+"""
+${notes}
+"""
+
+Evaluate their recall thoroughly, constructively, and encouragingly. Return valid JSON only with structure:
+{
+  "score": <number between 1 and 100 based on accuracy, depth, and detail>,
+  "feedback_markdown": "<Markdown structured feedback including:
+  ### 🌟 Key Strengths
+  (Bulleted list of what they got right/covered well)
+
+  ### 💡 Missing Concepts & Nuances
+  (Bulleted list of important facts/concepts they missed or overlooked)
+
+  ### ⚠️ Misconceptions (if any)
+  (Points where facts were incorrect or slightly off, or 'None observed!')
+
+  ### 🚀 Next Steps
+  (1-2 quick tips to deepen understanding)>"
+}`;
+
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: opts.maxTokens || 1200,
-          temperature: opts.temperature ?? 0.7,
-        },
-      }),
-    }
-  );
+        generationConfig: { responseMimeType: "application/json" }
+      })
+    });
 
-  if (!res.ok) {
-    let msg = `HTTP ${res.status}`;
-    try { const j = await res.json(); msg = j.error?.message || msg; } catch(_){}
-    throw new Error(msg);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || "API Error");
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const parsed = JSON.parse(text);
+
+    // Save to history
+    saveHistorySession({
+      topic: currentTopic.t,
+      category: currentTopic.c,
+      date: new Date().toISOString(),
+      notes: notes,
+      score: parsed.score,
+      feedback: parsed.feedback_markdown
+    });
+
+    // Render AI Feedback Section
+    document.getElementById("fbTopicNm").textContent = currentTopic.t;
+    document.getElementById("scoreNum").textContent = `${parsed.score}/100`;
+    document.getElementById("fbContent").innerHTML = simpleMarkdownToHtml(parsed.feedback_markdown);
+    document.getElementById("notesDisplay").textContent = notes;
+
+    document.getElementById("aiFeedbackCard").style.display = "block";
+    document.getElementById("selfRateCard").style.display = "none";
+    showSection("s-feedback");
+
+  } catch (err) {
+    showToast("Evaluation failed: " + err.message, true);
+    // Fallback to self-rate on failure
+    document.getElementById("notesDisplay").textContent = notes;
+    document.getElementById("aiFeedbackCard").style.display = "none";
+    document.getElementById("selfRateCard").style.display = "block";
+    resetStars();
+    showSection("s-feedback");
   }
-  const data = await res.json();
-  return data.candidates[0].content.parts[0].text;
 }
 
-async function geminiEvaluate(key, topic, notes) {
-  const prompt = `You are evaluating a learning exercise called "Brain Dump". The user was given the topic **"${topic}"** and had a timer to write everything they know about it from memory or research.
-
-Here is what they wrote:
-<brain_dump>
-${notes}
-</brain_dump>
-
-Provide a structured, encouraging evaluation. Use exactly this format:
-
-**Score: X/10**
-(Score based on accuracy, depth, and breadth. Be fair — reward genuine understanding.)
-
-**What you got right ✓**
-(Bullet list of accurate facts/concepts they included. Affirm good points.)
-
-**Factual errors or misconceptions ✗**
-(Bullet list of anything incorrect. If none, say "No significant errors — great job!" Be gentle but precise.)
-
-**Key things you missed 📌**
-(Bullet list of important aspects of this topic they didn't mention. Be educational, not discouraging.)
-
-**Dig deeper 📚**
-(2–3 genuinely interesting, surprising, or counterintuitive facts about this topic to expand their knowledge. Make these engaging.)
-
-Keep the tone warm, educational, and motivating. This is a self-improvement exercise.`;
-
-  return await geminiCall(key, prompt, { maxTokens: 1200, temperature: 0.7 });
-}
-
-async function geminiGenerateTopic(key) {
-  const seed = Math.floor(Math.random() * 1000000);
-  const prompt = `Pick ONE random, unusual, interesting topic for a knowledge test. It should be a real concept, event, phenomenon, person, or idea — something educational and testable. Avoid overly obscure things or purely subjective topics.
-
-Use random seed ${seed} to ensure variety. Return your answer as a single line in this exact format, no other text:
-TOPIC | CATEGORY
-
-Examples:
-The Antikythera mechanism | Ancient Tech
-The Dunning-Kruger effect | Psychology
-Kintsugi philosophy | Culture
-Superorganisms in nature | Biology
-The Tunguska event | History
-
-Now pick one:`;
-
-  const raw = await geminiCall(key, prompt, { maxTokens: 100, temperature: 1.0 });
-  const line = raw.trim().split('\n')[0].trim();
-  const parts = line.split('|').map(s => s.trim());
-  if (parts.length < 2 || !parts[0] || !parts[1]) {
-    throw new Error('AI returned invalid topic format');
-  }
-  return { t: parts[0], c: parts[1] };
+function retry() {
+  startSession();
 }
 
 // ═══════════════════════════════════════════════════════
-// FEEDBACK & HISTORY SAVE
+// SELF RATING (NO API KEY)
 // ═══════════════════════════════════════════════════════
-function showFeedback(text, notes, hasKey) {
-  const scoreM = text.match(/Score:\s*(\d+(?:\.\d+)?)\/10/i);
-  const score = scoreM ? scoreM[1] : null;
+function resetStars() {
+  currentRating = 0;
+  document.querySelectorAll(".star").forEach(s => s.classList.remove("lit"));
+  document.getElementById("rateMsg").textContent = "";
+}
 
-  document.getElementById('fbTopicNm').textContent = S.topic.t;
-  document.getElementById('scoreNum').textContent = score ? `${score}/10` : '—';
-  document.getElementById('fbContent').innerHTML = mdToHtml(text);
-  document.getElementById('notesDisplay').textContent = notes;
-  document.getElementById('aiFeedbackCard').style.display = '';
-  document.getElementById('selfRateCard').style.display = 'none';
+function rateSelf(stars) {
+  currentRating = stars;
+  const starEls = document.querySelectorAll(".star");
+  starEls.forEach((s, idx) => {
+    s.classList.toggle("lit", idx < stars);
+  });
 
-  saveToHistory({
-    date: Date.now(),
-    topic: S.topic.t,
-    category: S.topic.c,
-    source: S.topicSource,
+  const msgs = [
+    "Need to review this topic!",
+    "Basic recall, missing key details.",
+    "Decent summary! Got the main points.",
+    "Strong understanding! Great coverage.",
+    "Mastery level! Excellent brain dump."
+  ];
+  document.getElementById("rateMsg").textContent = msgs[stars - 1];
+
+  const notes = document.getElementById("writeArea").value.trim();
+  saveHistorySession({
+    topic: currentTopic.t,
+    category: currentTopic.c,
+    date: new Date().toISOString(),
     notes: notes,
-    score: score,
-    feedback: text,
-  });
-
-  showSection('s-feedback');
-}
-
-function showNoKeyFeedback(notes) {
-  document.getElementById('fbTopicNm').textContent = S.topic.t;
-  document.getElementById('notesDisplay').textContent = notes;
-  document.getElementById('scoreNum').textContent = '—';
-  document.getElementById('fbContent').innerHTML = '';
-  document.getElementById('aiFeedbackCard').style.display = 'none';
-  document.getElementById('selfRateCard').style.display = '';
-  document.querySelectorAll('.star').forEach(s => s.classList.remove('lit'));
-  document.getElementById('rateMsg').textContent = '';
-  showSection('s-feedback');
-}
-
-const RATE_MSGS = [
-  '',
-  "Tough topic — review and try again!",
-  "Some knowledge there — keep building!",
-  "Solid foundation. Fill in the gaps!",
-  "Strong! A few things left to master.",
-  "Excellent! You really know this topic.",
-];
-function rateSelf(n) {
-  document.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('lit', i < n));
-  document.getElementById('rateMsg').textContent = RATE_MSGS[n];
-  // Save self-rated to history
-  saveToHistory({
-    date: Date.now(),
-    topic: S.topic.t,
-    category: S.topic.c,
-    source: S.topicSource,
-    notes: S.savedNotes,
-    score: null,
-    selfRating: n,
-    feedback: null,
+    score: `${stars * 20}% (Self)`,
+    feedback: `Self-rated: ${stars}/5 Stars - ${msgs[stars - 1]}`
   });
 }
 
 // ═══════════════════════════════════════════════════════
-// HISTORY
+// HISTORY MANAGEMENT
 // ═══════════════════════════════════════════════════════
-function loadHistory() {
+function saveHistorySession(session) {
+  historySessions.unshift(session);
   try {
-    const raw = localStorage.getItem('brainDumpHistory');
-    S.history = raw ? JSON.parse(raw) : [];
-  } catch(_) { S.history = []; }
-}
-
-function saveToHistory(entry) {
-  S.history.unshift(entry);
-  if (S.history.length > HISTORY_LIMIT) S.history.length = HISTORY_LIMIT;
-  try { localStorage.setItem('brainDumpHistory', JSON.stringify(S.history)); } catch(_){}
+    localStorage.setItem("bdt_history", JSON.stringify(historySessions));
+  } catch(e){}
 }
 
 function showHistory() {
-  const list = document.getElementById('historyList');
-  const empty = document.getElementById('historyEmpty');
-  const actions = document.getElementById('historyActions');
+  const list = document.getElementById("historyList");
+  const empty = document.getElementById("historyEmpty");
+  const actions = document.getElementById("historyActions");
 
-  if (S.history.length === 0) {
-    list.innerHTML = '';
-    empty.style.display = '';
-    actions.style.display = 'none';
+  list.innerHTML = "";
+
+  if (!historySessions || historySessions.length === 0) {
+    empty.style.display = "block";
+    actions.style.display = "none";
   } else {
-    empty.style.display = 'none';
-    actions.style.display = '';
-    list.innerHTML = S.history.map((h, idx) => {
-      const d = new Date(h.date);
-      const dateStr = d.toLocaleDateString(undefined, { month:'short', day:'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
-      const scoreDisplay = h.score
-        ? `<div class="h-score">${h.score}/10</div>`
-        : h.selfRating
-          ? `<div class="h-score">${'★'.repeat(h.selfRating)}</div>`
-          : `<div class="h-score no-score">—</div>`;
-      return `
-        <div class="history-item" onclick="viewHistoryItem(${idx})">
-          ${scoreDisplay}
-          <div class="h-info">
-            <div class="h-topic">${escapeHtml(h.topic)}</div>
-            <div class="h-meta">${escapeHtml(h.category)} · ${dateStr}</div>
-          </div>
-          <button class="h-delete" onclick="event.stopPropagation(); deleteHistoryItem(${idx})" title="Delete">✕</button>
+    empty.style.display = "none";
+    actions.style.display = "block";
+
+    historySessions.forEach((s, idx) => {
+      const item = document.createElement("div");
+      item.className = "history-item";
+      item.onclick = () => viewHistoryDetail(idx);
+
+      const dateStr = new Date(s.date).toLocaleDateString(undefined, {
+        month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+      });
+
+      item.innerHTML = `
+        <div class="h-score ${!s.score ? 'no-score' : ''}">${s.score || 'N/A'}</div>
+        <div class="h-info">
+          <div class="h-topic">${escapeHtml(s.topic)}</div>
+          <div class="h-meta">${escapeHtml(s.category)} · ${dateStr}</div>
         </div>
+        <button class="h-delete" onclick="deleteHistoryItem(event, ${idx})" title="Delete session">🗑</button>
       `;
-    }).join('');
-  }
-  showSection('s-history');
-}
-
-function viewHistoryItem(idx) {
-  const h = S.history[idx];
-  if (!h) return;
-  document.getElementById('hdTopic').textContent = h.topic;
-  const d = new Date(h.date);
-  document.getElementById('hdMeta').textContent = `${h.category} · ${d.toLocaleString()}`;
-
-  if (h.score) {
-    document.getElementById('hdScoreBanner').style.display = '';
-    document.getElementById('hdScoreNum').textContent = `${h.score}/10`;
-  } else if (h.selfRating) {
-    document.getElementById('hdScoreBanner').style.display = '';
-    document.getElementById('hdScoreNum').textContent = '★'.repeat(h.selfRating);
-  } else {
-    document.getElementById('hdScoreBanner').style.display = 'none';
+      list.appendChild(item);
+    });
   }
 
-  document.getElementById('hdFeedback').innerHTML = h.feedback ? mdToHtml(h.feedback) : '<p style="color:var(--muted)">No AI feedback (self-rated session)</p>';
-  document.getElementById('hdNotes').textContent = h.notes;
-  showSection('s-history-detail');
+  showSection("s-history");
 }
 
-function deleteHistoryItem(idx) {
-  S.history.splice(idx, 1);
-  try { localStorage.setItem('brainDumpHistory', JSON.stringify(S.history)); } catch(_){}
+function viewHistoryDetail(idx) {
+  const s = historySessions[idx];
+  if (!s) return;
+
+  document.getElementById("hdTopic").textContent = s.topic;
+  const dateStr = new Date(s.date).toLocaleString();
+  document.getElementById("hdMeta").textContent = `${s.category} · ${dateStr}`;
+  document.getElementById("hdScoreNum").textContent = s.score || "N/A";
+  document.getElementById("hdFeedback").innerHTML = simpleMarkdownToHtml(s.feedback || "No feedback recorded.");
+  document.getElementById("hdNotes").textContent = s.notes;
+
+  showSection("s-history-detail");
+}
+
+function deleteHistoryItem(e, idx) {
+  e.stopPropagation();
+  historySessions.splice(idx, 1);
+  localStorage.setItem("bdt_history", JSON.stringify(historySessions));
   showHistory();
-  toast('Deleted');
 }
 
 function clearHistory() {
-  if (!confirm('Delete all session history? This cannot be undone.')) return;
-  S.history = [];
-  localStorage.removeItem('brainDumpHistory');
-  showHistory();
-  toast('History cleared');
+  if (confirm("Are you sure you want to clear all past sessions?")) {
+    historySessions = [];
+    localStorage.removeItem("bdt_history");
+    showHistory();
+  }
 }
 
 // ═══════════════════════════════════════════════════════
-// CUSTOM TOPICS
+// CUSTOM TOPICS MANAGEMENT
 // ═══════════════════════════════════════════════════════
-function loadCustomTopics() {
-  try {
-    const raw = localStorage.getItem('brainDumpCustomTopics');
-    S.customTopics = raw ? JSON.parse(raw) : [];
-  } catch(_) { S.customTopics = []; }
-}
-
-function saveCustomTopics() {
-  try { localStorage.setItem('brainDumpCustomTopics', JSON.stringify(S.customTopics)); } catch(_){}
-  updateTopicCountLabel();
-}
-
 function showTopicsMgmt() {
-  renderCustomTopics();
-  showSection('s-topics-mgmt');
+  renderCustomTopicsList();
+  showSection("s-topics-mgmt");
 }
 
-function renderCustomTopics() {
-  const list = document.getElementById('customTopicsList');
-  const empty = document.getElementById('customTopicsEmpty');
-  if (S.customTopics.length === 0) {
-    list.innerHTML = '';
-    empty.style.display = '';
+function renderCustomTopicsList() {
+  const container = document.getElementById("customTopicsList");
+  const empty = document.getElementById("customTopicsEmpty");
+
+  container.innerHTML = "";
+
+  if (customTopics.length === 0) {
+    empty.style.display = "block";
   } else {
-    empty.style.display = 'none';
-    list.innerHTML = S.customTopics.map((t, idx) => `
-      <div class="custom-topic-item">
+    empty.style.display = "none";
+    customTopics.forEach((t, idx) => {
+      const item = document.createElement("div");
+      item.className = "custom-topic-item";
+      item.innerHTML = `
         <div class="ct-body">
           <div class="ct-topic">${escapeHtml(t.t)}</div>
           <div class="ct-cat">${escapeHtml(t.c)}</div>
         </div>
-        <button class="h-delete" onclick="deleteCustomTopic(${idx})" title="Delete">✕</button>
-      </div>
-    `).join('');
+        <button class="h-delete" onclick="deleteCustomTopic(${idx})" title="Remove topic">🗑</button>
+      `;
+      container.appendChild(item);
+    });
   }
 }
 
 function addCustomTopic() {
-  const name = document.getElementById('newTopicName').value.trim();
-  const cat  = document.getElementById('newTopicCat').value.trim();
-  if (!name || !cat) { toast('Fill both fields', true); return; }
-  S.customTopics.unshift({ t: name, c: cat });
-  saveCustomTopics();
-  document.getElementById('newTopicName').value = '';
-  document.getElementById('newTopicCat').value = '';
-  renderCustomTopics();
-  toast('Topic added ✓');
+  const nameInput = document.getElementById("newTopicName");
+  const catInput = document.getElementById("newTopicCat");
+
+  const name = nameInput.value.trim();
+  const cat = catInput.value.trim() || "Custom";
+
+  if (!name) {
+    showToast("Topic name cannot be empty", true);
+    return;
+  }
+
+  customTopics.push({ t: name, c: cat, isCustom: true });
+  localStorage.setItem("bdt_custom_topics", JSON.stringify(customTopics));
+
+  nameInput.value = "";
+  catInput.value = "";
+
+  updateTopicCountLabel();
+  renderCustomTopicsList();
+  showToast("Custom topic added!");
 }
 
 function deleteCustomTopic(idx) {
-  S.customTopics.splice(idx, 1);
-  saveCustomTopics();
-  renderCustomTopics();
-  toast('Deleted');
+  customTopics.splice(idx, 1);
+  localStorage.setItem("bdt_custom_topics", JSON.stringify(customTopics));
+  updateTopicCountLabel();
+  renderCustomTopicsList();
 }
 
 // ═══════════════════════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════════════════════
-function escapeHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function showToast(msg, isErr = false) {
+  const toast = document.getElementById("toast");
+  toast.textContent = msg;
+  toast.className = isErr ? "err show" : "show";
+  setTimeout(() => { toast.className = ""; }, 3200);
 }
 
-function mdToHtml(text) {
-  const lines = text.split('\n');
-  let html = '';
-  let inUl = false;
-  for (let raw of lines) {
-    const line = raw.trim();
-    if (!line) {
-      if (inUl) { html += '</ul>'; inUl = false; }
-      continue;
-    }
-    if (line.startsWith('- ') || line.startsWith('• ')) {
-      if (!inUl) { html += '<ul>'; inUl = true; }
-      html += `<li>${inline(line.slice(2))}</li>`;
-    } else {
-      if (inUl) { html += '</ul>'; inUl = false; }
-      html += `<p>${inline(line)}</p>`;
-    }
-  }
-  if (inUl) html += '</ul>';
+function escapeHtml(str) {
+  return (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function simpleMarkdownToHtml(md) {
+  if (!md) return "";
+  let html = escapeHtml(md);
+
+  // Headers
+  html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+  html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+  html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+  // Bold
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+  // Lists
+  html = html.replace(/^\* (.*$)/gim, '<li>$1</li>');
+  html = html.replace(/^- (.*$)/gim, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+
+  // Paragraphs
+  html = html.split('\n\n').map(p => {
+    if (p.startsWith('<h') || p.startsWith('<ul')) return p;
+    return `<p>${p.replace(/\n/g, '<br>')}</p>`;
+  }).join('');
+
   return html;
-}
-function inline(s) {
-  return s
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>');
-}
-
-// ═══════════════════════════════════════════════════════
-// NAV
-// ═══════════════════════════════════════════════════════
-function showSection(id) {
-  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
-function retry() {
-  clearInterval(S.interval);
-  document.getElementById('submitBtn').classList.remove('pulsing');
-  startSession();
-}
-function goHome() {
-  clearInterval(S.interval);
-  document.getElementById('submitBtn').classList.remove('pulsing');
-  updateTopicCountLabel();
-  showSection('s-home');
-}
-
-// ═══════════════════════════════════════════════════════
-// TOAST
-// ═══════════════════════════════════════════════════════
-let toastTimer;
-function toast(msg, isErr) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = isErr ? 'show err' : 'show';
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.className = '', 3000);
 }
 </script>
 </body>
