@@ -1027,17 +1027,17 @@ async function rollAITopic() {
   try {
     const prompt = "Generate ONE interesting, highly specific, and unusual topic for a active recall brain-dump writing exercise. Examples: 'The 1919 Boston Molasses Flood', 'How PageRank algorithm works', 'The Fermi Paradox and Great Filter'. Return JSON only: {\"topic\": \"...\", \"category\": \"...\"}";
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`, {
-  method: "POST",
-  headers: { 
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${apiKey}`
-  },
-  body: JSON.stringify({
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { responseMimeType: "application/json" }
-  })
-});
+    const res = await fetch(
+  `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" }
+    })
+  }
+);
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error?.message || "API Error");
@@ -1227,17 +1227,17 @@ Evaluate their recall thoroughly, constructively, and encouragingly. Return vali
   (1-2 quick tips to deepen understanding)>"
 }`;
 
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`, {
-  method: "POST",
-  headers: { 
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${apiKey}`
-  },
-  body: JSON.stringify({
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { responseMimeType: "application/json" }
-  })
-});
+    const res = await fetch(
+  `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" }
+    })
+  }
+);
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error?.message || "API Error");
