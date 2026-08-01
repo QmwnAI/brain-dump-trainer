@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brain Dump Trainer</title>
+  <style>
+    :root {
+      --bg: #0d0d1a;
+      --surface: #13132a;
+      --surface2: #1a1a36;
+      --surface3: #222244;
+      --accent: #7c6ff7;
+      --accent2: #a78bfa;
+      --accent-glow: rgba(124, 111, 247, 0.25);
+      --text: #e8e8f4;
+      --muted: #7878a0;
+      --success: #4ade80;
+      --danger: #f87171;
+      --warn: #fbbf24;
+      --border: rgba(255,255,255,0.07);
+      --radius: 14px;
+      --radius-sm: 8px;
+      --toast-bg: #2a2a4a;
+      --toast-err-bg: #3a1a1a;
+      --toggle-bg: #1a1a36;
+    }
+
+    [data-theme="light"] {
+      --bg: #f2f1ff;
+      --surface: #ffffff;
+      --surface2: #eeeeff;
+      --surface3: #e2e1f8;
+      --accent: #6c5ff5;
+      --accent2: #7c6ff7;
+      --accent-glow: rgba(108, 95, 245, 0.15);
+      --text: #1a1830;
+      --muted: #6060a0;
+      --border: rgba(0,0,0,0.09);
+      --toast-bg: #ffffff;
+      --toast-err-bg: #fff0f0;
+      --toggle-bg: #e8e7ff;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 28px 16px 80px;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .app { width: 100%; max-width: 700px; display: flex; flex-direction: column; gap: 14px; }
+
+    /* HEADER */
+    .hdr { text-align: center; padding: 8px 0 4px; position: relative; }
+    .hdr h1 {
+      font-size: 1.9rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #a78bfa, #7c6ff7 50%, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hdr p { color: var(--muted); font-size: 0.88rem; margin-top: 5px; }
+
+    .theme-toggle {
+      position: absolute; right: 0; top: 6px;
+      background: var(--toggle-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      line-height: 1;
+    }
+    .theme-toggle:hover { transform: scale(1.1); }
+
+    /* CARD */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    /* API KEY */
+    .api-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .api-row label {
+      font-size: 0.78rem; color: var(--muted);
+      white-space: nowrap; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .api-row input {
+      flex: 1; min-width: 160px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 9px 13px;
+      color: var(--text);
+      font-size: 0.88rem;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .api-row input:focus { border-color: var(--accent); }
+    .api-hint {
+      font-size: 0.75rem; color: var(--muted);
+      margin-top: 8px; line-height: 1.4;
+    }
+    .api-hint a { color: var(--accent2); text-decoration: none; }
+
+    /* BUTTONS */
+    .btn {
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 10px 18px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:not(:disabled):hover {
+      background: var(--accent2);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px var(--accent-glow);
+    }
+    .btn-ghost {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:not(:disabled):hover { background: var(--surface3); transform: translateY(-1px); }
+    .btn-lg {
+      padding: 15px 28px;
+      font-size: 1.05rem;
+      border-radius: var(--radius);
+      width: 100%;
+    }
+    .btn-md { padding: 12px 20px; font-size: 0.95rem; width: 100%; }
+    .btn-sm { padding: 7px 12px; font-size: 0.82rem; }
+    .btn-danger { background: #4a1a1a; color: var(--danger); border: 1px solid rgba(248,113,113,0.3); }
+    .btn-danger:hover { background: #5a1a1a; }
+    .btn-row { display: flex; gap: 10px; }
+    .btn-row .btn { flex: 1; }
+
+    /* HOME NAV */
+    .home-nav {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .home-nav .btn { flex: 1; padding: 9px 12px; font-size: 0.82rem; }
+
+    /* SECTIONS */
+    .section { display: none; }
+    .section.active { display: block; animation: fadeUp 0.28s ease; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* TOPIC DISPLAY */
+    .topic-stage { text-align: center; padding: 10px 0 20px; }
+    .topic-chip {
+      display: inline-block;
+      background: var(--accent-glow);
+      color: var(--accent2);
+      border: 1px solid rgba(124,111,247,0.35);
+      border-radius: 20px;
+      padding: 3px 13px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 12px;
+    }
+    .topic-chip.ai { background: linear-gradient(90deg, rgba(56,189,248,0.2), rgba(167,139,250,0.2)); color: #38bdf8; border-color: rgba(56,189,248,0.35); }
+    .topic-chip.custom { background: rgba(74,222,128,0.15); color: var(--success); border-color: rgba(74,222,128,0.35); }
+    .topic-big {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
+    }
+
+    /* DURATION */
+    .dur-label {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .dur-row { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+    .dur-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 16px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .dur-btn:hover, .dur-btn.active {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+      color: var(--accent2);
+    }
+
+    .divider { height: 1px; background: var(--border); margin: 18px 0; }
+
+    /* WRITE */
+    .write-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .write-topic { flex: 1; }
+    .write-topic .label-sm {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+    .write-topic .topic-nm { font-size: 1.15rem; font-weight: 700; line-height: 1.3; }
+
+    /* TIMER */
+    .timer-wrap { position: relative; width: 96px; height: 96px; flex-shrink: 0; }
+    .timer-svg { transform: rotate(-90deg); }
+    .t-bg { fill: none; stroke: var(--surface3); stroke-width: 7; }
+    .t-arc {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 7;
+      stroke-linecap: round;
+      stroke-dasharray: 263.9;
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 0.95s linear, stroke 0.4s;
+    }
+    .t-arc.warn { stroke: var(--warn); }
+    .t-arc.danger { stroke: var(--danger); }
+    .t-arc.stopped { stroke: var(--muted); }
+    .timer-inner {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .timer-digits { font-size: 1.25rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .timer-sub { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+    /* TEXTAREA */
+    .write-area {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 15px;
+      color: var(--text);
+      font-size: 0.98rem;
+      font-family: inherit;
+      line-height: 1.65;
+      resize: vertical;
+      min-height: 220px;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .write-area:focus { border-color: var(--accent); }
+    .write-area::placeholder { color: var(--muted); }
+    .wc { text-align: right; font-size: 0.75rem; color: var(--muted); margin-top: 6px; }
+
+    /* SPINNER */
+    .spinner-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 36px; }
+    .spinner {
+      width: 38px; height: 38px;
+      border: 3px solid var(--surface3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* FEEDBACK */
+    .score-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .score-topic .label-sm {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .score-topic .tnm { font-size: 1.1rem; font-weight: 700; }
+    .score-badge {
+      text-align: center;
+      background: var(--accent-glow);
+      border: 1px solid rgba(124,111,247,0.3);
+      border-radius: var(--radius);
+      padding: 10px 18px;
+    }
+    .score-num {
+      font-size: 1.8rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent2), #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .score-lbl { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+
+    .saved-note {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--success);
+      margin-top: 10px;
+    }
+
+    .fb-content { font-size: 0.93rem; line-height: 1.65; color: var(--text); }
+    .fb-content p { margin: 6px 0; }
+    .fb-content ul, .fb-content ol { padding-left: 20px; margin: 6px 0; }
+    .fb-content li { margin: 4px 0; }
+    .fb-content strong { color: var(--text); font-weight: 700; }
+    .fb-content h1, .fb-content h2, .fb-content h3 {
+      color: var(--accent2);
+      margin: 14px 0 6px;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .your-notes-card .label-sm {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .notes-display {
+      font-size: 0.88rem;
+      color: var(--muted);
+      line-height: 1.65;
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    /* SELF-RATE */
+    .self-rate { text-align: center; padding: 8px 0 4px; }
+    .self-rate p { color: var(--muted); font-size: 0.88rem; margin-bottom: 14px; }
+    .stars { display: flex; justify-content: center; gap: 10px; margin-bottom: 6px; }
+    .star {
+      font-size: 2rem; cursor: pointer;
+      transition: transform 0.1s;
+      filter: grayscale(1) opacity(0.4);
+      user-select: none;
+    }
+    .star.lit { filter: none; }
+    .star:hover { transform: scale(1.2); }
+
+    /* HISTORY */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .section-title { font-size: 1.2rem; font-weight: 700; }
+    .history-list { display: flex; flex-direction: column; gap: 10px; }
+    .history-item {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .history-item:hover { border-color: var(--accent); transform: translateX(3px); }
+    .h-score {
+      background: var(--accent-glow);
+      color: var(--accent2);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-weight: 800;
+      font-size: 0.85rem;
+      min-width: 46px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .h-score.no-score { background: var(--surface3); color: var(--muted); }
+    .h-info { flex: 1; min-width: 0; }
+    .h-topic {
+      font-size: 0.92rem;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .h-meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+    .h-delete {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1.1rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      transition: all 0.15s;
+    }
+    .h-delete:hover { color: var(--danger); background: rgba(248,113,113,0.1); }
+    .empty-state {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.88rem;
+      padding: 32px 12px;
+    }
+
+    /* CUSTOM TOPICS */
+    .add-form { display: flex; flex-direction: column; gap: 10px; }
+    .form-row { display: flex; gap: 8px; }
+    .form-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 13px;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus { border-color: var(--accent); }
+    .form-input::placeholder { color: var(--muted); }
+    .custom-topic-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      margin-bottom: 8px;
+    }
+    .ct-body { flex: 1; min-width: 0; }
+    .ct-topic { font-size: 0.9rem; font-weight: 600; }
+    .ct-cat { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+    /* MISC */
+    .reroll-note { text-align: center; font-size: 0.75rem; color: var(--muted); margin-top: 8px; }
+    .info-note {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 10px;
+      line-height: 1.5;
+      text-align: center;
+    }
+
+    /* TOAST */
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      background: var(--toast-bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 11px 22px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      opacity: 0;
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+      z-index: 9999;
+      white-space: nowrap;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #toast.err { background: var(--toast-err-bg); border-color: rgba(248,113,113,0.3); }
+
+    @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 var(--accent-glow)} 50%{box-shadow:0 0 0 8px transparent} }
+    .pulsing { animation: pulse 1.5s ease-in-out infinite; }
+
+    @keyframes diceRoll { 0%{transform:rotate(0) scale(1)} 30%{transform:rotate(180deg) scale(0.8)} 70%{transform:rotate(270deg) scale(1.1)} 100%{transform:rotate(360deg) scale(1)} }
+    .dice-spin { display: inline-block; animation: diceRoll 0.45s ease; }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--surface3); border-radius: 3px; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">🌙</button>
+    <h1>Brain Dump Trainer</h1>
+    <p>Roll a topic, reflect, write everything you know, get instant feedback</p>
+  </div>
+
+  <!-- API KEY CARD -->
+  <div class="card">
+    <div class="api-row">
+      <label for="apiKey">Gemini API Key</label>
+      <input type="password" id="apiKey" placeholder="AIza..." autocomplete="off" />
+      <button class="btn btn-ghost" onclick="toggleKey(this)">Show</button>
+      <button class="btn btn-primary" onclick="saveKey()">Save</button>
+    </div>
+    <div class="api-hint">
+      Stored only in your browser's localStorage. Get a free key at
+      <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com</a>
+      — free tier is 15 requests/minute, more than enough. Works without one too (self-rate mode).
+    </div>
+  </div>
+
+  <!-- SECTION: HOME -->
+  <div class="section active" id="s-home">
+    <div class="home-nav">
+      <button class="btn btn-ghost" onclick="showHistory()">📜 History</button>
+      <button class="btn btn-ghost" onclick="showTopicsMgmt()">✏️ My Topics</button>
+    </div>
+    <div class="card" style="text-align:center; padding: 32px 22px;">
+      <p style="color:var(--muted); font-size:0.88rem; margin-bottom:22px;">
+        Roll a topic to test your knowledge. <span id="topicCountLabel">120+ topics</span> across science, history, philosophy, and more.
+      </p>
+      <button class="btn btn-primary btn-lg" onclick="rollTopic(true)" style="margin-bottom:10px;">
+        <span id="diceSpan">🎲</span> Roll a Random Topic
+      </button>
+      <button class="btn btn-ghost btn-md" onclick="rollAITopic()" id="aiRollBtn">
+        🤖 Let AI Pick Something Unusual
+      </button>
+      <div class="info-note">
+        AI picks use one Gemini API call — free but counts toward the 15/min limit.
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION: TOPIC CHOSEN -->
+  <div class="section" id="s-topic">
+    <div class="card">
+      <div class="topic-stage">
+        <div class="topic-chip" id="topicChip">Category</div>
+        <div class="topic-big" id="topicBig">Topic Name</div>
+      </div>
+      <div class="divider"></div>
+      <div class="dur-label">How long to write?</div>
+      <div class="dur-row" id="durRow">
+        <button class="dur-btn" onclick="setDur(5)">5 min</button>
+        <button class="dur-btn active" onclick="setDur(7)">7 min</button>
+        <button class="dur-btn" onclick="setDur(10)">10 min</button>
+        <button class="dur-btn" onclick="setDur(15)">15 min</button>
+      </div>
+      <div class="divider"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="rollTopic(false)">🔄 Reroll</button>
+        <button class="btn btn-primary" style="flex:2" onclick="startSession()">▶ Start Timer &amp; Write</button>
+      </div>
+      <div class="reroll-note" id="rerollNote"></div>
+    </div>
+  </div>
+
+  <!-- SECTION: WRITING + TIMER -->
+  <div class="section" id="s-write">
+    <div class="card">
+      <div class="write-top">
+        <div class="write-topic">
+          <div class="label-sm">Topic</div>
+          <div class="topic-nm" id="writeTopicNm">—</div>
+        </div>
+        <div class="timer-wrap">
+          <svg class="timer-svg" width="96" height="96" viewBox="0 0 100 100">
+            <circle class="t-bg" cx="50" cy="50" r="42"/>
+            <circle class="t-arc" id="tArc" cx="50" cy="50" r="42"/>
+          </svg>
+          <div class="timer-inner">
+            <div class="timer-digits" id="tDigits">7:00</div>
+            <div class="timer-sub" id="tSub">ready</div>
+          </div>
+        </div>
+      </div>
+
+      <textarea
+        class="write-area"
+        id="writeArea"
+        placeholder="Write everything you know about this topic. Facts, concepts, history, examples, connections — stream of consciousness is perfect. Don't edit yourself."
+        oninput="onNoteInput()"
+      ></textarea>
+      <div class="wc" id="wc">0 words</div>
+
+      <div class="divider"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
+        <button class="btn btn-ghost" id="stopBtn" onclick="endTimer()">⏹ End Timer</button>
+        <button class="btn btn-primary" style="flex:2" id="submitBtn" onclick="submit()">✓ Submit for Review</button>
+      </div>
+      <div class="info-note">
+        <strong>Pause</strong> freezes the timer · <strong>End Timer</strong> stops it (keep writing) · <strong>Submit</strong> ends the session
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION: LOADING -->
+  <div class="section" id="s-loading">
+    <div class="card">
+      <div class="spinner-wrap">
+        <div class="spinner"></div>
+        <div style="color:var(--muted); font-size:0.88rem;" id="loadingMsg">Evaluating your brain dump…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION: FEEDBACK -->
+  <div class="section" id="s-feedback">
+    <div class="card" id="aiFeedbackCard">
+      <div class="score-banner">
+        <div class="score-topic">
+          <div class="label-sm">You wrote about</div>
+          <div class="tnm" id="fbTopicNm">—</div>
+        </div>
+        <div class="score-badge">
+          <div class="score-num" id="scoreNum">—</div>
+          <div class="score-lbl">score</div>
+        </div>
+      </div>
+      <div class="fb-content" id="fbContent"></div>
+      <div class="saved-note" id="savedNote">💾 Session saved to history</div>
+      <div class="divider"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="retry()">🔁 Try Again</button>
+        <button class="btn btn-primary" style="flex:2" onclick="goHome()">🎲 New Topic</button>
+      </div>
+    </div>
+
+    <div class="card" id="selfRateCard" style="display:none;">
+      <div class="self-rate">
+        <p>No API key — how well do you think you did?</p>
+        <div class="stars" id="starsRow">
+          <span class="star" onclick="rateSelf(1)">⭐</span>
+          <span class="star" onclick="rateSelf(2)">⭐</span>
+          <span class="star" onclick="rateSelf(3)">⭐</span>
+          <span class="star" onclick="rateSelf(4)">⭐</span>
+          <span class="star" onclick="rateSelf(5)">⭐</span>
+        </div>
+        <div id="rateMsg" style="color:var(--muted); font-size:0.85rem; min-height:20px;"></div>
+      </div>
+      <div class="divider"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="retry()">🔁 Try Again</button>
+        <button class="btn btn-primary" style="flex:2" onclick="goHome()">🎲 New Topic</button>
+      </div>
+    </div>
+
+    <div class="card your-notes-card">
+      <div class="label-sm">What you wrote</div>
+      <div class="notes-display" id="notesDisplay"></div>
+    </div>
+  </div>
+
+  <!-- SECTION: HISTORY -->
+  <div class="section" id="s-history">
+    <div class="card">
+      <div class="section-header">
+        <div class="section-title">📜 Past Sessions</div>
+        <button class="btn btn-ghost btn-sm" onclick="goHome()">← Back</button>
+      </div>
+      <div id="historyList" class="history-list"></div>
+      <div id="historyEmpty" class="empty-state" style="display:none;">
+        No sessions yet — go dump some brains!
+      </div>
+      <div id="historyActions" style="margin-top:14px; display:none;">
+        <button class="btn btn-danger btn-sm" style="width:100%" onclick="clearHistory()">🗑 Clear All History</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION: HISTORY DETAIL -->
+  <div class="section" id="s-history-detail">
+    <div class="card">
+      <div class="section-header">
+        <div class="section-title" id="hdTopic">—</div>
+        <button class="btn btn-ghost btn-sm" onclick="showHistory()">← Back</button>
+      </div>
+      <div id="hdMeta" style="color:var(--muted); font-size:0.8rem; margin-bottom:14px;"></div>
+      <div class="score-banner" id="hdScoreBanner">
+        <div class="score-topic">
+          <div class="label-sm">Your score</div>
+        </div>
+        <div class="score-badge">
+          <div class="score-num" id="hdScoreNum">—</div>
+          <div class="score-lbl">score</div>
+        </div>
+      </div>
+      <div class="fb-content" id="hdFeedback"></div>
+    </div>
+    <div class="card your-notes-card">
+      <div class="label-sm">What you wrote</div>
+      <div class="notes-display" id="hdNotes"></div>
+    </div>
+  </div>
+
+  <!-- SECTION: MANAGE TOPICS -->
+  <div class="section" id="s-topics-mgmt">
+    <div class="card">
+      <div class="section-header">
+        <div class="section-title">✏️ My Custom Topics</div>
+        <button class="btn btn-ghost btn-sm" onclick="goHome()">← Back</button>
+      </div>
+      <div class="add-form">
+        <div class="form-row">
+          <input class="form-input" type="text" id="newTopicName" placeholder="Topic (e.g. 'React hooks')" maxlength="80" />
+          <input class="form-input" type="text" id="newTopicCat" placeholder="Category" maxlength="30" style="max-width:130px;" />
+        </div>
+        <button class="btn btn-primary" onclick="addCustomTopic()">+ Add Topic</button>
+      </div>
+      <div class="info-note">
+        Your topics mix into the random pool alongside the built-in ones.
+      </div>
+      <div class="divider"></div>
+      <div id="customTopicsList"></div>
+      <div id="customTopicsEmpty" class="empty-state" style="display:none;">
+        No custom topics yet. Add some above!
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// BUILT-IN TOPICS
+// ═══════════════════════════════════════════════════════
+const BUILTIN_TOPICS = [
+  {t:"Quantum entanglement",c:"Physics"},
+  {t:"The theory of general relativity",c:"Physics"},
+  {t:"The Higgs boson",c:"Physics"},
+  {t:"Superconductivity",c:"Physics"},
+  {t:"Radioactivity and nuclear fission",c:"Physics"},
+  {t:"The Standard Model of particle physics",c:"Physics"},
+  {t:"The Doppler effect",c:"Physics"},
+  {t:"Thermodynamics and entropy",c:"Physics"},
+  {t:"Dark matter and dark energy",c:"Cosmology"},
+  {t:"Black holes and event horizons",c:"Cosmology"},
+  {t:"The Big Bang theory",c:"Cosmology"},
+  {t:"Neutron stars and pulsars",c:"Cosmology"},
+  {t:"The expanding universe",c:"Cosmology"},
+  {t:"CRISPR gene editing",c:"Biology"},
+  {t:"How vaccines work",c:"Medicine"},
+  {t:"The human immune system",c:"Biology"},
+  {t:"DNA replication",c:"Biology"},
+  {t:"Epigenetics",c:"Biology"},
+  {t:"Stem cell research",c:"Biology"},
+  {t:"Photosynthesis",c:"Biology"},
+  {t:"Neuroplasticity",c:"Neuroscience"},
+  {t:"The gut-brain axis",c:"Neuroscience"},
+  {t:"How memory works",c:"Neuroscience"},
+  {t:"The placebo effect",c:"Medicine"},
+  {t:"Antibiotic resistance",c:"Medicine"},
+  {t:"Fermentation",c:"Biology"},
+  {t:"The endocrine system",c:"Biology"},
+  {t:"Mitosis vs meiosis",c:"Biology"},
+  {t:"mRNA technology",c:"Medicine"},
+  {t:"Quantum computing",c:"Technology"},
+  {t:"How the internet works",c:"Technology"},
+  {t:"Cryptography and public-key encryption",c:"Technology"},
+  {t:"Artificial neural networks",c:"AI"},
+  {t:"Blockchain technology",c:"Technology"},
+  {t:"How GPS works",c:"Technology"},
+  {t:"How solar panels work",c:"Technology"},
+  {t:"How lithium-ion batteries work",c:"Technology"},
+  {t:"Moore's Law and transistors",c:"Technology"},
+  {t:"How Wi-Fi works",c:"Technology"},
+  {t:"The transformer model in AI",c:"AI"},
+  {t:"Computer vision",c:"AI"},
+  {t:"How compilers work",c:"Computing"},
+  {t:"Operating systems and scheduling",c:"Computing"},
+  {t:"The Silk Road",c:"History"},
+  {t:"The fall of the Roman Empire",c:"History"},
+  {t:"The French Revolution",c:"History"},
+  {t:"The Space Race",c:"History"},
+  {t:"The Renaissance",c:"History"},
+  {t:"The Black Death",c:"History"},
+  {t:"The Mongol Empire",c:"History"},
+  {t:"The Industrial Revolution",c:"History"},
+  {t:"The Cold War",c:"History"},
+  {t:"Ancient Egyptian civilization",c:"History"},
+  {t:"The Byzantine Empire",c:"History"},
+  {t:"The Age of Exploration",c:"History"},
+  {t:"The Ottoman Empire",c:"History"},
+  {t:"Causes of World War I",c:"History"},
+  {t:"The Meiji Restoration",c:"History"},
+  {t:"The Scientific Revolution",c:"History"},
+  {t:"The American Civil War",c:"History"},
+  {t:"The Haitian Revolution",c:"History"},
+  {t:"The Roman Republic",c:"History"},
+  {t:"The Crusades",c:"History"},
+  {t:"Stoicism",c:"Philosophy"},
+  {t:"The trolley problem",c:"Ethics"},
+  {t:"Free will vs determinism",c:"Philosophy"},
+  {t:"Plato's Theory of Forms",c:"Philosophy"},
+  {t:"Utilitarianism",c:"Philosophy"},
+  {t:"The social contract",c:"Philosophy"},
+  {t:"Existentialism",c:"Philosophy"},
+  {t:"The philosophy of consciousness",c:"Philosophy"},
+  {t:"Epistemology",c:"Philosophy"},
+  {t:"Kant's categorical imperative",c:"Philosophy"},
+  {t:"Nihilism",c:"Philosophy"},
+  {t:"The Socratic method",c:"Philosophy"},
+  {t:"The water cycle",c:"Earth Science"},
+  {t:"Coral reef ecosystems",c:"Ecology"},
+  {t:"Animal migration patterns",c:"Ecology"},
+  {t:"Mycorrhizal fungi networks",c:"Ecology"},
+  {t:"Ocean currents and climate",c:"Earth Science"},
+  {t:"The carbon cycle",c:"Earth Science"},
+  {t:"Plate tectonics",c:"Earth Science"},
+  {t:"Volcanic activity",c:"Earth Science"},
+  {t:"Biodiversity and mass extinction",c:"Ecology"},
+  {t:"El Niño and La Niña",c:"Meteorology"},
+  {t:"Symbiosis in nature",c:"Ecology"},
+  {t:"Permafrost and climate change",c:"Earth Science"},
+  {t:"How clouds and rain form",c:"Meteorology"},
+  {t:"Tidal forces and the moon",c:"Earth Science"},
+  {t:"Supply and demand",c:"Economics"},
+  {t:"Inflation and deflation",c:"Economics"},
+  {t:"Game theory",c:"Economics"},
+  {t:"Behavioral economics",c:"Economics"},
+  {t:"The tragedy of the commons",c:"Economics"},
+  {t:"Universal basic income",c:"Economics"},
+  {t:"How central banks work",c:"Economics"},
+  {t:"Comparative advantage in trade",c:"Economics"},
+  {t:"The gig economy",c:"Economics"},
+  {t:"How stock markets work",c:"Economics"},
+  {t:"The prisoner's dilemma",c:"Economics"},
+  {t:"Prime numbers and the Riemann hypothesis",c:"Mathematics"},
+  {t:"Fractals and self-similarity",c:"Mathematics"},
+  {t:"The Fibonacci sequence and the golden ratio",c:"Mathematics"},
+  {t:"Non-Euclidean geometry",c:"Mathematics"},
+  {t:"Set theory and Cantor's infinity",c:"Mathematics"},
+  {t:"Boolean logic",c:"Mathematics"},
+  {t:"Bayesian probability",c:"Mathematics"},
+  {t:"Calculus: derivatives and integrals",c:"Mathematics"},
+  {t:"Graph theory",c:"Mathematics"},
+  {t:"Chaos theory",c:"Mathematics"},
+  {t:"Cognitive biases",c:"Psychology"},
+  {t:"How sleep works",c:"Psychology"},
+  {t:"The psychology of decision making",c:"Psychology"},
+  {t:"Classical conditioning (Pavlov)",c:"Psychology"},
+  {t:"Maslow's hierarchy of needs",c:"Psychology"},
+  {t:"The stress response",c:"Psychology"},
+  {t:"Flow state",c:"Psychology"},
+  {t:"Attachment theory",c:"Psychology"},
+  {t:"Jazz music and its origins",c:"Music"},
+  {t:"The Impressionist movement",c:"Art"},
+  {t:"Ancient Greek theater",c:"Culture"},
+  {t:"The Bauhaus design movement",c:"Art"},
+  {t:"Hip-hop culture and origins",c:"Music"},
+  {t:"The origins of cinema",c:"Film"},
+  {t:"Japanese haiku poetry",c:"Literature"},
+  {t:"The Surrealist movement",c:"Art"},
+  {t:"How languages evolve",c:"Linguistics"},
+  {t:"The origins of writing systems",c:"History"},
+  {t:"The Sahara Desert formation",c:"Geography"},
+  {t:"The Mariana Trench",c:"Geography"},
+  {t:"The Gulf Stream",c:"Geography"},
+  {t:"Formation of the Himalayas",c:"Geography"},
+  {t:"The Amazon rainforest",c:"Ecology"},
+  {t:"Monsoon weather systems",c:"Meteorology"},
+  {t:"How caves and stalactites form",c:"Geology"},
+  {t:"The formation of the Grand Canyon",c:"Geology"},
+];
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+const S = {
+  topic: null,
+  topicSource: 'builtin', // 'builtin' | 'custom' | 'ai'
+  dur: 7 * 60,
+  totalDur: 7 * 60,
+  timeLeft: 0,
+  interval: null,
+  paused: false,
+  ended: false,
+  rerolls: 3,
+  savedNotes: '',
+  customTopics: [],
+  history: [],
+};
+
+const CIRC = 263.9;
+const HISTORY_LIMIT = 50;
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  const k = localStorage.getItem('brainDumpKey');
+  if (k) document.getElementById('apiKey').value = k;
+  setDur(7);
+  applyTheme(localStorage.getItem('brainDumpTheme') || 'dark');
+  loadCustomTopics();
+  loadHistory();
+  updateTopicCountLabel();
+});
+
+// ═══════════════════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════════════════
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('themeToggle').textContent = theme === 'dark' ? '🌙' : '☀️';
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('brainDumpTheme', next);
+  applyTheme(next);
+}
+
+// ═══════════════════════════════════════════════════════
+// API KEY
+// ═══════════════════════════════════════════════════════
+function saveKey() {
+  const v = document.getElementById('apiKey').value.trim();
+  if (!v) { toast('Enter a key first', true); return; }
+  localStorage.setItem('brainDumpKey', v);
+  toast('API key saved ✓');
+}
+function toggleKey(btn) {
+  const inp = document.getElementById('apiKey');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
+  else { inp.type = 'password'; btn.textContent = 'Show'; }
+}
+function getKey() {
+  return localStorage.getItem('brainDumpKey') || document.getElementById('apiKey').value.trim();
+}
+
+// ═══════════════════════════════════════════════════════
+// TOPIC POOL
+// ═══════════════════════════════════════════════════════
+function getAllTopics() {
+  const custom = S.customTopics.map(t => ({...t, source:'custom'}));
+  const builtin = BUILTIN_TOPICS.map(t => ({...t, source:'builtin'}));
+  return [...builtin, ...custom];
+}
+
+function updateTopicCountLabel() {
+  const total = BUILTIN_TOPICS.length + S.customTopics.length;
+  const custom = S.customTopics.length;
+  const el = document.getElementById('topicCountLabel');
+  if (custom > 0) {
+    el.textContent = `${total} topics (${custom} custom)`;
+  } else {
+    el.textContent = `${total}+ topics`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// TOPIC ROLLING
+// ═══════════════════════════════════════════════════════
+function rollTopic(fromHome) {
+  if (!fromHome && S.rerolls <= 0) { toast('No more rerolls!', true); return; }
+  const sp = document.getElementById('diceSpan');
+  sp.className = 'dice-spin';
+  setTimeout(() => sp.className = '', 450);
+
+  const pool = getAllTopics();
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+  S.topic = { t: picked.t, c: picked.c };
+  S.topicSource = picked.source;
+
+  renderTopic();
+  S.rerolls = fromHome ? 3 : Math.max(0, S.rerolls - 1);
+  updateRerollNote();
+  showSection('s-topic');
+}
+
+async function rollAITopic() {
+  const key = getKey();
+  if (!key) { toast('Need an API key for AI-generated topics', true); return; }
+
+  const btn = document.getElementById('aiRollBtn');
+  btn.disabled = true;
+  btn.textContent = '🤖 Thinking...';
+
+  try {
+    const topic = await geminiGenerateTopic(key);
+    S.topic = topic;
+    S.topicSource = 'ai';
+    renderTopic();
+    S.rerolls = 3;
+    updateRerollNote();
+    showSection('s-topic');
+  } catch(e) {
+    toast(`AI error: ${e.message}`, true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🤖 Let AI Pick Something Unusual';
+  }
+}
+
+function renderTopic() {
+  const chip = document.getElementById('topicChip');
+  chip.textContent = S.topic.c;
+  chip.className = 'topic-chip' + (S.topicSource === 'ai' ? ' ai' : S.topicSource === 'custom' ? ' custom' : '');
+  document.getElementById('topicBig').textContent = S.topic.t;
+}
+
+function updateRerollNote() {
+  const el = document.getElementById('rerollNote');
+  el.textContent = S.rerolls > 0
+    ? `${S.rerolls} reroll${S.rerolls !== 1 ? 's' : ''} remaining`
+    : 'No rerolls left — commit to this one!';
+}
+
+// ═══════════════════════════════════════════════════════
+// DURATION
+// ═══════════════════════════════════════════════════════
+function setDur(m) {
+  S.dur = m * 60;
+  S.totalDur = m * 60;
+  document.querySelectorAll('.dur-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === `${m} min`);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// TIMER
+// ═══════════════════════════════════════════════════════
+function startSession() {
+  clearInterval(S.interval);
+  S.timeLeft = S.dur;
+  S.totalDur = S.dur;
+  S.paused = false;
+  S.ended = false;
+
+  document.getElementById('writeTopicNm').textContent = S.topic.t;
+  document.getElementById('writeArea').value = '';
+  document.getElementById('wc').textContent = '0 words';
+  document.getElementById('pauseBtn').textContent = '⏸ Pause';
+  document.getElementById('pauseBtn').disabled = false;
+  document.getElementById('stopBtn').disabled = false;
+  document.getElementById('submitBtn').classList.remove('pulsing');
+  document.getElementById('tArc').classList.remove('stopped');
+
+  renderTimer();
+  document.getElementById('tSub').textContent = 'writing';
+  showSection('s-write');
+
+  S.interval = setInterval(tick, 1000);
+}
+
+function tick() {
+  if (S.paused || S.ended) return;
+  S.timeLeft = Math.max(0, S.timeLeft - 1);
+  renderTimer();
+  if (S.timeLeft === 0) {
+    clearInterval(S.interval);
+    document.getElementById('tSub').textContent = "time's up!";
+    document.getElementById('submitBtn').classList.add('pulsing');
+    toast("Time's up! Submit when ready.");
+  }
+}
+
+function renderTimer() {
+  const m = Math.floor(S.timeLeft / 60);
+  const s = S.timeLeft % 60;
+  document.getElementById('tDigits').textContent = `${m}:${String(s).padStart(2,'0')}`;
+
+  const pct = S.timeLeft / S.totalDur;
+  document.getElementById('tArc').style.strokeDashoffset = CIRC * (1 - pct);
+
+  const arc = document.getElementById('tArc');
+  arc.classList.remove('warn','danger');
+  if (!S.ended) {
+    if (pct < 0.15) arc.classList.add('danger');
+    else if (pct < 0.33) arc.classList.add('warn');
+  }
+
+  if (!S.paused && !S.ended && S.timeLeft > 0) {
+    document.getElementById('tSub').textContent = 'writing';
+  }
+}
+
+function togglePause() {
+  if (S.ended) return;
+  S.paused = !S.paused;
+  document.getElementById('pauseBtn').textContent = S.paused ? '▶ Resume' : '⏸ Pause';
+  document.getElementById('tSub').textContent = S.paused ? 'paused' : 'writing';
+}
+
+function endTimer() {
+  if (S.ended) return;
+  S.ended = true;
+  clearInterval(S.interval);
+  document.getElementById('tSub').textContent = 'stopped';
+  document.getElementById('tArc').classList.add('stopped');
+  document.getElementById('pauseBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = true;
+  toast('Timer stopped — take your time.');
+}
+
+// ═══════════════════════════════════════════════════════
+// WORD COUNT
+// ═══════════════════════════════════════════════════════
+function onNoteInput() {
+  const txt = document.getElementById('writeArea').value;
+  const w = txt.trim() ? txt.trim().split(/\s+/).length : 0;
+  document.getElementById('wc').textContent = `${w} word${w !== 1 ? 's' : ''}`;
+}
+
+// ═══════════════════════════════════════════════════════
+// SUBMIT
+// ═══════════════════════════════════════════════════════
+async function submit() {
+  clearInterval(S.interval);
+  const notes = document.getElementById('writeArea').value.trim();
+  if (!notes) { toast('Write something first!', true); return; }
+  S.savedNotes = notes;
+
+  const key = getKey();
+  if (!key) { showNoKeyFeedback(notes); return; }
+
+  showSection('s-loading');
+  document.getElementById('loadingMsg').textContent = 'Evaluating your brain dump…';
+  try {
+    const fb = await geminiEvaluate(key, S.topic.t, notes);
+    showFeedback(fb, notes, true);
+  } catch(e) {
+    showSection('s-write');
+    toast(`Error: ${e.message}`, true);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// GEMINI API
+// ═══════════════════════════════════════════════════════
+async function geminiCall(key, prompt, opts = {}) {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(key)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: opts.maxTokens || 1200,
+          temperature: opts.temperature ?? 0.7,
+        },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const j = await res.json(); msg = j.error?.message || msg; } catch(_){}
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  return data.candidates[0].content.parts[0].text;
+}
+
+async function geminiEvaluate(key, topic, notes) {
+  const prompt = `You are evaluating a learning exercise called "Brain Dump". The user was given the topic **"${topic}"** and had a timer to write everything they know about it from memory or research.
+
+Here is what they wrote:
+<brain_dump>
+${notes}
+</brain_dump>
+
+Provide a structured, encouraging evaluation. Use exactly this format:
+
+**Score: X/10**
+(Score based on accuracy, depth, and breadth. Be fair — reward genuine understanding.)
+
+**What you got right ✓**
+(Bullet list of accurate facts/concepts they included. Affirm good points.)
+
+**Factual errors or misconceptions ✗**
+(Bullet list of anything incorrect. If none, say "No significant errors — great job!" Be gentle but precise.)
+
+**Key things you missed 📌**
+(Bullet list of important aspects of this topic they didn't mention. Be educational, not discouraging.)
+
+**Dig deeper 📚**
+(2–3 genuinely interesting, surprising, or counterintuitive facts about this topic to expand their knowledge. Make these engaging.)
+
+Keep the tone warm, educational, and motivating. This is a self-improvement exercise.`;
+
+  return await geminiCall(key, prompt, { maxTokens: 1200, temperature: 0.7 });
+}
+
+async function geminiGenerateTopic(key) {
+  const seed = Math.floor(Math.random() * 1000000);
+  const prompt = `Pick ONE random, unusual, interesting topic for a knowledge test. It should be a real concept, event, phenomenon, person, or idea — something educational and testable. Avoid overly obscure things or purely subjective topics.
+
+Use random seed ${seed} to ensure variety. Return your answer as a single line in this exact format, no other text:
+TOPIC | CATEGORY
+
+Examples:
+The Antikythera mechanism | Ancient Tech
+The Dunning-Kruger effect | Psychology
+Kintsugi philosophy | Culture
+Superorganisms in nature | Biology
+The Tunguska event | History
+
+Now pick one:`;
+
+  const raw = await geminiCall(key, prompt, { maxTokens: 100, temperature: 1.0 });
+  const line = raw.trim().split('\n')[0].trim();
+  const parts = line.split('|').map(s => s.trim());
+  if (parts.length < 2 || !parts[0] || !parts[1]) {
+    throw new Error('AI returned invalid topic format');
+  }
+  return { t: parts[0], c: parts[1] };
+}
+
+// ═══════════════════════════════════════════════════════
+// FEEDBACK & HISTORY SAVE
+// ═══════════════════════════════════════════════════════
+function showFeedback(text, notes, hasKey) {
+  const scoreM = text.match(/Score:\s*(\d+(?:\.\d+)?)\/10/i);
+  const score = scoreM ? scoreM[1] : null;
+
+  document.getElementById('fbTopicNm').textContent = S.topic.t;
+  document.getElementById('scoreNum').textContent = score ? `${score}/10` : '—';
+  document.getElementById('fbContent').innerHTML = mdToHtml(text);
+  document.getElementById('notesDisplay').textContent = notes;
+  document.getElementById('aiFeedbackCard').style.display = '';
+  document.getElementById('selfRateCard').style.display = 'none';
+
+  saveToHistory({
+    date: Date.now(),
+    topic: S.topic.t,
+    category: S.topic.c,
+    source: S.topicSource,
+    notes: notes,
+    score: score,
+    feedback: text,
+  });
+
+  showSection('s-feedback');
+}
+
+function showNoKeyFeedback(notes) {
+  document.getElementById('fbTopicNm').textContent = S.topic.t;
+  document.getElementById('notesDisplay').textContent = notes;
+  document.getElementById('scoreNum').textContent = '—';
+  document.getElementById('fbContent').innerHTML = '';
+  document.getElementById('aiFeedbackCard').style.display = 'none';
+  document.getElementById('selfRateCard').style.display = '';
+  document.querySelectorAll('.star').forEach(s => s.classList.remove('lit'));
+  document.getElementById('rateMsg').textContent = '';
+  showSection('s-feedback');
+}
+
+const RATE_MSGS = [
+  '',
+  "Tough topic — review and try again!",
+  "Some knowledge there — keep building!",
+  "Solid foundation. Fill in the gaps!",
+  "Strong! A few things left to master.",
+  "Excellent! You really know this topic.",
+];
+function rateSelf(n) {
+  document.querySelectorAll('.star').forEach((s, i) => s.classList.toggle('lit', i < n));
+  document.getElementById('rateMsg').textContent = RATE_MSGS[n];
+  // Save self-rated to history
+  saveToHistory({
+    date: Date.now(),
+    topic: S.topic.t,
+    category: S.topic.c,
+    source: S.topicSource,
+    notes: S.savedNotes,
+    score: null,
+    selfRating: n,
+    feedback: null,
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// HISTORY
+// ═══════════════════════════════════════════════════════
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem('brainDumpHistory');
+    S.history = raw ? JSON.parse(raw) : [];
+  } catch(_) { S.history = []; }
+}
+
+function saveToHistory(entry) {
+  S.history.unshift(entry);
+  if (S.history.length > HISTORY_LIMIT) S.history.length = HISTORY_LIMIT;
+  try { localStorage.setItem('brainDumpHistory', JSON.stringify(S.history)); } catch(_){}
+}
+
+function showHistory() {
+  const list = document.getElementById('historyList');
+  const empty = document.getElementById('historyEmpty');
+  const actions = document.getElementById('historyActions');
+
+  if (S.history.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = '';
+    actions.style.display = 'none';
+  } else {
+    empty.style.display = 'none';
+    actions.style.display = '';
+    list.innerHTML = S.history.map((h, idx) => {
+      const d = new Date(h.date);
+      const dateStr = d.toLocaleDateString(undefined, { month:'short', day:'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+      const scoreDisplay = h.score
+        ? `<div class="h-score">${h.score}/10</div>`
+        : h.selfRating
+          ? `<div class="h-score">${'★'.repeat(h.selfRating)}</div>`
+          : `<div class="h-score no-score">—</div>`;
+      return `
+        <div class="history-item" onclick="viewHistoryItem(${idx})">
+          ${scoreDisplay}
+          <div class="h-info">
+            <div class="h-topic">${escapeHtml(h.topic)}</div>
+            <div class="h-meta">${escapeHtml(h.category)} · ${dateStr}</div>
+          </div>
+          <button class="h-delete" onclick="event.stopPropagation(); deleteHistoryItem(${idx})" title="Delete">✕</button>
+        </div>
+      `;
+    }).join('');
+  }
+  showSection('s-history');
+}
+
+function viewHistoryItem(idx) {
+  const h = S.history[idx];
+  if (!h) return;
+  document.getElementById('hdTopic').textContent = h.topic;
+  const d = new Date(h.date);
+  document.getElementById('hdMeta').textContent = `${h.category} · ${d.toLocaleString()}`;
+
+  if (h.score) {
+    document.getElementById('hdScoreBanner').style.display = '';
+    document.getElementById('hdScoreNum').textContent = `${h.score}/10`;
+  } else if (h.selfRating) {
+    document.getElementById('hdScoreBanner').style.display = '';
+    document.getElementById('hdScoreNum').textContent = '★'.repeat(h.selfRating);
+  } else {
+    document.getElementById('hdScoreBanner').style.display = 'none';
+  }
+
+  document.getElementById('hdFeedback').innerHTML = h.feedback ? mdToHtml(h.feedback) : '<p style="color:var(--muted)">No AI feedback (self-rated session)</p>';
+  document.getElementById('hdNotes').textContent = h.notes;
+  showSection('s-history-detail');
+}
+
+function deleteHistoryItem(idx) {
+  S.history.splice(idx, 1);
+  try { localStorage.setItem('brainDumpHistory', JSON.stringify(S.history)); } catch(_){}
+  showHistory();
+  toast('Deleted');
+}
+
+function clearHistory() {
+  if (!confirm('Delete all session history? This cannot be undone.')) return;
+  S.history = [];
+  localStorage.removeItem('brainDumpHistory');
+  showHistory();
+  toast('History cleared');
+}
+
+// ═══════════════════════════════════════════════════════
+// CUSTOM TOPICS
+// ═══════════════════════════════════════════════════════
+function loadCustomTopics() {
+  try {
+    const raw = localStorage.getItem('brainDumpCustomTopics');
+    S.customTopics = raw ? JSON.parse(raw) : [];
+  } catch(_) { S.customTopics = []; }
+}
+
+function saveCustomTopics() {
+  try { localStorage.setItem('brainDumpCustomTopics', JSON.stringify(S.customTopics)); } catch(_){}
+  updateTopicCountLabel();
+}
+
+function showTopicsMgmt() {
+  renderCustomTopics();
+  showSection('s-topics-mgmt');
+}
+
+function renderCustomTopics() {
+  const list = document.getElementById('customTopicsList');
+  const empty = document.getElementById('customTopicsEmpty');
+  if (S.customTopics.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = '';
+  } else {
+    empty.style.display = 'none';
+    list.innerHTML = S.customTopics.map((t, idx) => `
+      <div class="custom-topic-item">
+        <div class="ct-body">
+          <div class="ct-topic">${escapeHtml(t.t)}</div>
+          <div class="ct-cat">${escapeHtml(t.c)}</div>
+        </div>
+        <button class="h-delete" onclick="deleteCustomTopic(${idx})" title="Delete">✕</button>
+      </div>
+    `).join('');
+  }
+}
+
+function addCustomTopic() {
+  const name = document.getElementById('newTopicName').value.trim();
+  const cat  = document.getElementById('newTopicCat').value.trim();
+  if (!name || !cat) { toast('Fill both fields', true); return; }
+  S.customTopics.unshift({ t: name, c: cat });
+  saveCustomTopics();
+  document.getElementById('newTopicName').value = '';
+  document.getElementById('newTopicCat').value = '';
+  renderCustomTopics();
+  toast('Topic added ✓');
+}
+
+function deleteCustomTopic(idx) {
+  S.customTopics.splice(idx, 1);
+  saveCustomTopics();
+  renderCustomTopics();
+  toast('Deleted');
+}
+
+// ═══════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function mdToHtml(text) {
+  const lines = text.split('\n');
+  let html = '';
+  let inUl = false;
+  for (let raw of lines) {
+    const line = raw.trim();
+    if (!line) {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      continue;
+    }
+    if (line.startsWith('- ') || line.startsWith('• ')) {
+      if (!inUl) { html += '<ul>'; inUl = true; }
+      html += `<li>${inline(line.slice(2))}</li>`;
+    } else {
+      if (inUl) { html += '</ul>'; inUl = false; }
+      html += `<p>${inline(line)}</p>`;
+    }
+  }
+  if (inUl) html += '</ul>';
+  return html;
+}
+function inline(s) {
+  return s
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>');
+}
+
+// ═══════════════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════════════
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function retry() {
+  clearInterval(S.interval);
+  document.getElementById('submitBtn').classList.remove('pulsing');
+  startSession();
+}
+function goHome() {
+  clearInterval(S.interval);
+  document.getElementById('submitBtn').classList.remove('pulsing');
+  updateTopicCountLabel();
+  showSection('s-home');
+}
+
+// ═══════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════
+let toastTimer;
+function toast(msg, isErr) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = isErr ? 'show err' : 'show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = '', 3000);
+}
+</script>
+</body>
+</html>
