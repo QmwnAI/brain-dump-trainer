@@ -1033,6 +1033,11 @@ async function rollAITopic() {
     "Content-Type": "application/json",
     "x-goog-api-key": apiKey
   },
+  body: JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { responseMimeType: "application/json" }
+  })
+});
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error?.message || "API Error");
@@ -1228,6 +1233,11 @@ Evaluate their recall thoroughly, constructively, and encouragingly. Return vali
     "Content-Type": "application/json",
     "x-goog-api-key": apiKey
   },
+  body: JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { responseMimeType: "application/json" }
+  })
+});
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error?.message || "API Error");
