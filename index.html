@@ -480,6 +480,25 @@
         min-height: 240px;
       }
     }
+  /* Final alignment pass */
+    .app { margin-inline: auto; }
+    .card, .home-nav, .section { width: 100%; }
+    .card { overflow: hidden; }
+    .hdr { width: 100%; }
+    .write-top, .score-banner { width: 100%; }
+    .topic-stage { width: 100%; }
+    .dur-row { width: 100%; justify-content: center; }
+    .btn-row { width: 100%; }
+    .write-area { display: block; }
+    .api-row { width: 100%; }
+    .api-row input { min-width: 0; }
+    @media (max-width: 640px) {
+      .app { gap: 14px; }
+      .hdr { padding-inline: 2px; }
+      .card { padding: 18px; }
+      .topic-stage { padding-inline: 2px; }
+      .dur-row { justify-content: flex-start; }
+    }
   </style>
 </head>
 <body>
