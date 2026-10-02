@@ -125,6 +125,7 @@
     }
 
     .home-nav {
+      margin-bottom: 18px;
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 8px;
@@ -202,7 +203,7 @@
     }
 
     .topic-stage {
-      text-align: left;
+      text-align: center;
       padding: 8px 0 12px;
     }
 
@@ -229,9 +230,11 @@
       line-height: 1.15;
       font-weight: 500;
       max-width: 760px;
+      margin-inline: auto;
     }
 
     .dur-label {
+      text-align: center;
       margin: 10px 0;
       color: var(--muted);
       font-size: .74rem;
@@ -243,6 +246,7 @@
     .dur-row {
       display: flex;
       flex-wrap: wrap;
+      justify-content: center;
       gap: 8px;
     }
 
@@ -263,7 +267,7 @@
     .score-banner {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       gap: 20px;
     }
 
@@ -508,6 +512,8 @@
       .timer-wrap {
         align-self: center;
       }
+      .write-topic, .score-topic { text-align: center; width: 100%; }
+      .score-badge { align-self: center; }
       .btn-row {
         flex-direction: column;
       }
@@ -524,7 +530,7 @@
       border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; outline:none;
     }
     .api-row input:focus, .form-input:focus { border-color:var(--accent); }
-    .api-hint, .info-note, .reroll-note { margin-top:10px; color:var(--muted); font-size:.76rem; line-height:1.5; }
+    .api-hint, .info-note, .reroll-note { margin-top:10px; text-align:center; color:var(--muted); font-size:.76rem; line-height:1.5; }
     .api-hint a { color:var(--accent); }
     .btn-lg { width:100%; padding:15px 20px; font-size:1rem; }
     .btn-md { width:100%; padding:12px 18px; }
@@ -595,7 +601,7 @@
       .hdr { padding-inline: 2px; }
       .card { padding: 18px; }
       .topic-stage { padding-inline: 2px; }
-      .dur-row { justify-content: flex-start; }
+      .dur-row { justify-content: center; }
     }
 
     [data-theme="dark"] .btn-danger { background: rgba(225,132,132,.14); }
