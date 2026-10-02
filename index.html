@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-  <!-- redeploy: 2026-09-22-clean -->
+  <!-- redeploy: 2026-10-02-merged -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Brain Dump Trainer</title>
@@ -82,9 +82,12 @@
       padding: 18px 4px 6px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
+      text-align: center;
       gap: 18px;
     }
+
+    .hdr-copy { padding-inline: 56px; }
 
     .hdr h1 {
       font-family: Georgia, "Times New Roman", serif;
@@ -102,7 +105,9 @@
     }
 
     .theme-toggle {
-      position: static;
+      position: absolute;
+      top: 18px;
+      right: 4px;
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text);
@@ -480,10 +485,11 @@
     @media (max-width: 640px) {
       body { padding: 14px 10px 56px; }
       .hdr {
-        align-items: flex-start;
         padding-top: 10px;
         gap: 12px;
       }
+      .hdr-copy { padding-inline: 44px; }
+      .theme-toggle { top: 10px; }
 
       .hdr h1 {
         font-size: clamp(1.9rem, 9vw, 2.5rem);
@@ -591,6 +597,24 @@
       .topic-stage { padding-inline: 2px; }
       .dur-row { justify-content: flex-start; }
     }
+
+    [data-theme="dark"] .btn-danger { background: rgba(225,132,132,.14); }
+    [data-theme="dark"] .write-area { box-shadow: none; }
+    [data-theme="dark"] .write-area:focus { box-shadow: 0 0 0 4px rgba(224,122,82,.14); }
+
+    /* Merged from original: dice spin, pulsing submit, star highlight */
+    .dice-spin { display:inline-block; animation: diceRoll .45s ease; }
+    @keyframes diceRoll {
+      0%{transform:rotate(0) scale(1)} 30%{transform:rotate(180deg) scale(.8)}
+      70%{transform:rotate(270deg) scale(1.1)} 100%{transform:rotate(360deg) scale(1)}
+    }
+    .pulsing { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse {
+      0%,100%{box-shadow:0 0 0 0 rgba(196,90,54,.45)} 50%{box-shadow:0 0 0 8px transparent}
+    }
+    .star { cursor:pointer; filter:grayscale(1) opacity(.4); }
+    .star.lit { filter:none; }
+    .star:hover { transform:scale(1.2); }
   </style>
 </head>
 <body>
@@ -1085,8 +1109,7 @@ const BUILTIN_TOPICS = [
   {t:"Cognitive behavioral therapy principles",c:"Psychology"},
   {t:"The Stanford prison experiment critique",c:"Psychology"},
   {t:"Implicit bias",c:"Psychology"},
-  {t:"Association testing",c:"Psychology"},
-  {t:"Neuroplasticity",c:"Psychology"},
+  {t:"The Implicit Association Test",c:"Psychology"},
   {t:"Phantom limbs",c:"Psychology"},
   {t:"The Dunning-Kruger effect",c:"Psychology"},
   {t:"Expressionism in visual arts",c:"Art"},
@@ -1198,7 +1221,10 @@ let isTimerEnded = false;
 let customTopics = [];
 let historySessions = [];
 let currentRating = 0;
+let ratedEntry = null; // history entry for the current self-rating (updated in place)
 let lastFeedbackMode = 'ai'; // 'ai' | 'self' | 'present'
+let rerolls = 3;
+const HISTORY_LIMIT = 50;
 
 let presentInterval = null;
 let presentRemaining = 60;
@@ -1256,7 +1282,9 @@ function goHome() {
 
 function updateTopicCountLabel() {
   const total = BUILTIN_TOPICS.length + customTopics.length;
-  document.getElementById("topicCountLabel").textContent = `${total}+ topics`;
+  const custom = customTopics.length;
+  document.getElementById("topicCountLabel").textContent =
+    custom > 0 ? `${total} topics (${custom} custom)` : `${total}+ topics`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1286,15 +1314,18 @@ function getKey() {
 // ═══════════════════════════════════════════════════════
 // TOPIC ROLLING
 // ═══════════════════════════════════════════════════════
-function rollTopic(animate = true) {
+function rollTopic(fromHome = true) {
+  if (!fromHome && rerolls <= 0) { showToast("No more rerolls!", true); return; }
+
   const dice = document.getElementById("diceSpan");
-  if (animate && dice) {
+  if (fromHome && dice) {
     dice.classList.remove("dice-spin");
     void dice.offsetWidth;
     dice.classList.add("dice-spin");
   }
 
-  const pool = [...BUILTIN_TOPICS, ...customTopics];
+  let pool = [...BUILTIN_TOPICS, ...customTopics];
+  if (!fromHome && currentTopic) pool = pool.filter(x => x.t !== currentTopic.t);
   const choice = pool[Math.floor(Math.random() * pool.length)];
 
   currentTopic = {
@@ -1304,6 +1335,7 @@ function rollTopic(animate = true) {
     isCustom: choice.isCustom || false
   };
 
+  rerolls = fromHome ? 3 : Math.max(0, rerolls - 1);
   renderTopicCard();
   showSection("s-topic");
 }
@@ -1320,7 +1352,8 @@ async function rollAITopic() {
   btn.textContent = "🤖 Generating...";
 
   try {
-    const prompt = "Generate ONE interesting, highly specific, and unusual topic for a active recall brain-dump writing exercise. Examples: 'The 1919 Boston Molasses Flood', 'How PageRank algorithm works', 'The Fermi Paradox and Great Filter'. Return JSON only: {\"topic\": \"...\", \"category\": \"...\"}";
+    const seed = Math.floor(Math.random() * 1000000);
+    const prompt = "Generate ONE interesting, highly specific, and unusual topic for an active recall brain-dump writing exercise. Use random seed " + seed + " for variety. Examples: 'The 1919 Boston Molasses Flood', 'How PageRank algorithm works', 'The Fermi Paradox and Great Filter'. Return JSON only: {\"topic\": \"...\", \"category\": \"...\"}";
 
     const res = await fetch(
   `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
@@ -1329,7 +1362,7 @@ async function rollAITopic() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json" }
+      generationConfig: { responseMimeType: "application/json", temperature: 1.0 }
     })
   }
 );
@@ -1338,7 +1371,9 @@ async function rollAITopic() {
     if (!res.ok) throw new Error(data.error?.message || "API Error");
 
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    const parsed = JSON.parse(text);
+    if (!text) throw new Error("Empty response from Gemini");
+    const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+    if (!parsed.topic) throw new Error("No topic returned");
 
     currentTopic = {
       t: parsed.topic,
@@ -1347,6 +1382,7 @@ async function rollAITopic() {
       isCustom: false
     };
 
+    rerolls = 3;
     renderTopicCard();
     showSection("s-topic");
   } catch (err) {
@@ -1374,13 +1410,16 @@ function renderTopicCard() {
   }
 
   big.textContent = currentTopic.t;
-  note.textContent = currentTopic.isAi ? "Generated by Gemini" : "";
+  const rr = rerolls > 0
+    ? `${rerolls} reroll${rerolls !== 1 ? "s" : ""} remaining`
+    : "No rerolls left — commit to this one!";
+  note.textContent = (currentTopic.isAi ? "Generated by Gemini · " : "") + rr;
 }
 
 function setDur(min) {
   currentDurationMin = min;
   document.querySelectorAll(".dur-btn").forEach(b => {
-    b.classList.toggle("active", b.textContent.includes(`${min} min`));
+    b.classList.toggle("active", b.textContent.trim() === `${min} min`);
   });
 }
 
@@ -1400,6 +1439,7 @@ function startSession() {
   document.getElementById("pauseBtn").disabled = false;
   document.getElementById("stopBtn").disabled = false;
   document.getElementById("pauseBtn").textContent = "⏸ Pause";
+  document.getElementById("submitBtn").classList.remove("pulsing");
 
   updateTimerUI();
   showSection("s-write");
@@ -1418,6 +1458,7 @@ function tickTimer() {
 
   if (remainingSeconds <= 0) {
     endTimer();
+    document.getElementById("submitBtn").classList.add("pulsing");
     showToast("⏰ Time's up! Finish your thought and submit.");
   }
 }
@@ -1465,8 +1506,9 @@ function endTimer() {
 
 function stopTimer() {
   clearInterval(timerInterval);
-  document.getElementById("pauseBtn").disabled = false;
-  document.getElementById("stopBtn").disabled = false;
+  document.getElementById("pauseBtn").disabled = isTimerEnded;
+  document.getElementById("stopBtn").disabled = isTimerEnded;
+  document.getElementById("submitBtn").classList.remove("pulsing");
 }
 
 function onNoteInput() {
@@ -1622,7 +1664,8 @@ Evaluate their recall thoroughly, constructively, and encouragingly. Return vali
     if (!res.ok) throw new Error(data.error?.message || "API Error");
 
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    const parsed = JSON.parse(text);
+    if (!text) throw new Error("Empty response from Gemini");
+    const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
 
     // Save to history
     lastFeedbackMode = 'ai';
@@ -1646,15 +1689,14 @@ Evaluate their recall thoroughly, constructively, and encouragingly. Return vali
     showSection("s-feedback");
 
   } catch (err) {
+    // Back to the writing screen so your notes aren't lost and you can resubmit
+    if (!isTimerEnded && remainingSeconds > 0) {
+      timerInterval = setInterval(tickTimer, 1000);
+    } else if (remainingSeconds <= 0) {
+      document.getElementById("submitBtn").classList.add("pulsing");
+    }
+    showSection("s-write");
     showToast("Evaluation failed: " + err.message, true);
-    // Fallback to self-rate on failure
-    lastFeedbackMode = 'self';
-    document.getElementById("notesDisplay").textContent = notes;
-    document.getElementById("aiFeedbackCard").style.display = "none";
-    document.getElementById("selfRateCard").style.display = "block";
-    document.getElementById("selfRatePrompt").textContent = "No API key — how well do you think you did?";
-    resetStars();
-    showSection("s-feedback");
   }
 }
 
@@ -1668,6 +1710,7 @@ function retry() {
 // ═══════════════════════════════════════════════════════
 function resetStars() {
   currentRating = 0;
+  ratedEntry = null;
   document.querySelectorAll(".star").forEach(s => s.classList.remove("lit"));
   document.getElementById("rateMsg").textContent = "";
 }
@@ -1690,7 +1733,7 @@ function rateSelf(stars) {
 
   const notes = document.getElementById("writeArea").value.trim();
   const isPresent = lastFeedbackMode === 'present';
-  saveHistorySession({
+  const entry = {
     topic: currentTopic.t,
     category: currentTopic.c,
     date: new Date().toISOString(),
@@ -1699,17 +1742,30 @@ function rateSelf(stars) {
     feedback: isPresent
       ? `Presented out loud, self-rated: ${stars}/5 Stars - ${msgs[stars - 1]}`
       : `Self-rated: ${stars}/5 Stars - ${msgs[stars - 1]}`
-  });
+  };
+
+  if (ratedEntry && historySessions.includes(ratedEntry)) {
+    Object.assign(ratedEntry, entry); // re-rating: update, don't duplicate
+    persistHistory();
+  } else {
+    saveHistorySession(entry);
+    ratedEntry = entry;
+  }
 }
 
 // ═══════════════════════════════════════════════════════
 // HISTORY MANAGEMENT
 // ═══════════════════════════════════════════════════════
-function saveHistorySession(session) {
-  historySessions.unshift(session);
+function persistHistory() {
   try {
     localStorage.setItem("bdt_history", JSON.stringify(historySessions));
   } catch(e){}
+}
+
+function saveHistorySession(session) {
+  historySessions.unshift(session);
+  if (historySessions.length > HISTORY_LIMIT) historySessions.length = HISTORY_LIMIT;
+  persistHistory();
 }
 
 function showHistory() {
@@ -1736,7 +1792,7 @@ function showHistory() {
       });
 
       item.innerHTML = `
-        <div class="h-score ${!s.score ? 'no-score' : ''}">${s.score || 'N/A'}</div>
+        <div class="h-score ${!s.score ? 'no-score' : ''}">${escapeHtml(String(s.score || 'N/A'))}</div>
         <div class="h-info">
           <div class="h-topic">${escapeHtml(s.topic)}</div>
           <div class="h-meta">${escapeHtml(s.category)} · ${dateStr}</div>
@@ -1845,11 +1901,13 @@ function deleteCustomTopic(idx) {
 // ═══════════════════════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════════════════════
+let toastTimer;
 function showToast(msg, isErr = false) {
   const toast = document.getElementById("toast");
   toast.textContent = msg;
   toast.className = isErr ? "err show" : "show";
-  setTimeout(() => { toast.className = ""; }, 3200);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.className = ""; }, 3200);
 }
 
 function escapeHtml(str) {
@@ -1858,28 +1916,24 @@ function escapeHtml(str) {
 
 function simpleMarkdownToHtml(md) {
   if (!md) return "";
-  let html = escapeHtml(md);
-
-  // Headers
-  html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-  html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-  html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-
-  // Bold
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-  // Lists
-  html = html.replace(/^\* (.*$)/gim, '<li>$1</li>');
-  html = html.replace(/^- (.*$)/gim, '<li>$1</li>');
-  html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
-
-  // Paragraphs
-  html = html.split('\n\n').map(p => {
-    if (p.startsWith('<h') || p.startsWith('<ul')) return p;
-    return `<p>${p.replace(/\n/g, '<br>')}</p>`;
-  }).join('');
-
-  return html;
+  const inline = s => escapeHtml(s)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>");
+  let html = "", inUl = false;
+  for (const raw of md.split("\n")) {
+    const line = raw.trim();
+    const li = line.match(/^[-*•]\s+(.*)/);
+    const h = line.match(/^(#{1,3})\s+(.*)/);
+    if (li) {
+      if (!inUl) { html += "<ul>"; inUl = true; }
+      html += `<li>${inline(li[1])}</li>`;
+      continue;
+    }
+    if (inUl) { html += "</ul>"; inUl = false; }
+    if (h) html += `<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`;
+    else if (line) html += `<p>${inline(line)}</p>`;
+  }
+  return html + (inUl ? "</ul>" : "");
 }
 </script>
 </body>
