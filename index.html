@@ -613,6 +613,20 @@
     [data-theme="dark"] .write-area { box-shadow: none; }
     [data-theme="dark"] .write-area:focus { box-shadow: 0 0 0 4px rgba(224,122,82,.14); }
 
+    /* Score tiers: green >= 80, amber 60-79, red < 60 */
+    .score-badge.tier-good, .h-score.tier-good { background: color-mix(in srgb, var(--success) 16%, transparent); border-color: color-mix(in srgb, var(--success) 45%, transparent); }
+    .score-badge.tier-mid,  .h-score.tier-mid  { background: color-mix(in srgb, var(--warn) 16%, transparent);    border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+    .score-badge.tier-low,  .h-score.tier-low  { background: color-mix(in srgb, var(--danger) 16%, transparent);  border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+    .score-badge.tier-good .score-num, .h-score.tier-good { color: var(--success); }
+    .score-badge.tier-mid  .score-num, .h-score.tier-mid  { color: var(--warn); }
+    .score-badge.tier-low  .score-num, .h-score.tier-low  { color: var(--danger); }
+
+    /* Writing screen: tighter header, auto-growing textarea (no grip, no inner scrollbar) */
+    #s-write .card { padding-top: 16px; }
+    #s-write .timer-wrap { width: 88px; height: 88px; }
+    .write-top { margin-bottom: 12px; }
+    .write-area { resize: none; overflow: hidden; }
+
     /* Merged from original: dice spin, pulsing submit, star highlight */
     .dice-spin { display:inline-block; animation: diceRoll .45s ease; }
     @keyframes diceRoll {
@@ -817,6 +831,10 @@
           <span class="star" onclick="rateSelf(5)">⭐</span>
         </div>
         <div id="rateMsg" style="color:var(--muted); font-size:0.85rem; min-height:20px;"></div>
+      </div>
+      <div class="btn-row" id="presentActions" style="display:none; margin-top:14px;">
+        <button class="btn btn-ghost" onclick="backToWriting()">✏️ Back to Notes</button>
+        <button class="btn btn-primary" style="flex:2" id="aiReviewBtn" onclick="submit()">✨ Get AI Review</button>
       </div>
       <div class="divider"></div>
       <div class="btn-row">
@@ -1440,6 +1458,7 @@ function setDur(min) {
 function startSession() {
   document.getElementById("writeTopicNm").textContent = currentTopic.t;
   document.getElementById("writeArea").value = "";
+  document.getElementById("writeArea").style.height = "auto";
   document.getElementById("wc").textContent = "0 words";
 
   totalSeconds = currentDurationMin * 60;
@@ -1522,7 +1541,14 @@ function stopTimer() {
   document.getElementById("submitBtn").classList.remove("pulsing");
 }
 
+function autosizeNotes() {
+  const ta = document.getElementById("writeArea");
+  ta.style.height = "auto";
+  ta.style.height = (ta.scrollHeight + 2) + "px";
+}
+
 function onNoteInput() {
+  autosizeNotes();
   const val = document.getElementById("writeArea").value.trim();
   const words = val ? val.split(/\s+/).length : 0;
   document.getElementById("wc").textContent = `${words} word${words === 1 ? "" : "s"}`;
@@ -1603,7 +1629,18 @@ function finishPresent() {
   document.getElementById("selfRateCard").style.display = "block";
   document.getElementById("selfRatePrompt").textContent = "How did your presentation go?";
   resetStars();
+  document.getElementById("presentActions").style.display = "flex";
+  document.getElementById("aiReviewBtn").style.display = getKey() ? "" : "none";
   showSection("s-feedback");
+}
+
+function backToWriting() {
+  clearInterval(presentInterval);
+  clearInterval(timerInterval);
+  if (!isTimerEnded && remainingSeconds > 0) {
+    timerInterval = setInterval(tickTimer, 1000);
+  }
+  showSection("s-write");
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1628,6 +1665,7 @@ async function submit() {
     document.getElementById("selfRateCard").style.display = "block";
     document.getElementById("selfRatePrompt").textContent = "No API key — how well do you think you did?";
     resetStars();
+    document.getElementById("presentActions").style.display = "none";
     showSection("s-feedback");
     return;
   }
@@ -1680,18 +1718,26 @@ Evaluate their recall thoroughly, constructively, and encouragingly. Return vali
 
     // Save to history
     lastFeedbackMode = 'ai';
-    saveHistorySession({
+    const aiEntry = {
       topic: currentTopic.t,
       category: currentTopic.c,
       date: new Date().toISOString(),
       notes: notes,
       score: parsed.score,
       feedback: parsed.feedback_markdown
-    });
+    };
+    if (ratedEntry && historySessions.includes(ratedEntry)) {
+      Object.assign(ratedEntry, aiEntry); // upgrade the presentation self-rating
+      persistHistory();
+    } else {
+      saveHistorySession(aiEntry);
+    }
+    ratedEntry = null;
 
     // Render AI Feedback Section
     document.getElementById("fbTopicNm").textContent = currentTopic.t;
     document.getElementById("scoreNum").textContent = `${parsed.score}/100`;
+    document.getElementById("scoreNum").parentElement.className = "score-badge " + scoreTier(parsed.score);
     document.getElementById("fbContent").innerHTML = simpleMarkdownToHtml(parsed.feedback_markdown);
     document.getElementById("notesDisplay").textContent = notes;
 
@@ -1767,6 +1813,12 @@ function rateSelf(stars) {
 // ═══════════════════════════════════════════════════════
 // HISTORY MANAGEMENT
 // ═══════════════════════════════════════════════════════
+function scoreTier(score) {
+  const n = parseFloat(String(score));
+  if (isNaN(n)) return "";
+  return n >= 80 ? "tier-good" : n >= 60 ? "tier-mid" : "tier-low";
+}
+
 function persistHistory() {
   try {
     localStorage.setItem("bdt_history", JSON.stringify(historySessions));
@@ -1803,7 +1855,7 @@ function showHistory() {
       });
 
       item.innerHTML = `
-        <div class="h-score ${!s.score ? 'no-score' : ''}">${escapeHtml(String(s.score || 'N/A'))}</div>
+        <div class="h-score ${!s.score ? 'no-score' : scoreTier(s.score)}">${escapeHtml(String(s.score || 'N/A'))}</div>
         <div class="h-info">
           <div class="h-topic">${escapeHtml(s.topic)}</div>
           <div class="h-meta">${escapeHtml(s.category)} · ${dateStr}</div>
@@ -1825,6 +1877,7 @@ function viewHistoryDetail(idx) {
   const dateStr = new Date(s.date).toLocaleString();
   document.getElementById("hdMeta").textContent = `${s.category} · ${dateStr}`;
   document.getElementById("hdScoreNum").textContent = s.score || "N/A";
+  document.getElementById("hdScoreNum").parentElement.className = "score-badge " + scoreTier(s.score);
   document.getElementById("hdFeedback").innerHTML = simpleMarkdownToHtml(s.feedback || "No feedback recorded.");
   document.getElementById("hdNotes").textContent = s.notes;
 
